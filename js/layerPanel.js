@@ -79,8 +79,8 @@
     // I am putting it here as a temporary home.
     if (itemId) {
       this.InitializeNavigation(viewer.GetDiv(), itemId);
-      this.Initialize(this.Div, itemId);
     }
+    this.Initialize(this.Div, itemId);
 
     // To get event calls from the viewer.
     this.Viewer.AddLayer(this);
@@ -591,22 +591,24 @@
       .on('mousemove touchmove', function () { return true; })
       .css({'direction': 'ltr'});
 
-    // Get a list of annotations and populate the button div.
-    // But first, get info about the user (to manage sharing).
-    var self = this;
-    girder.rest.restRequest({
-      url: 'user/me',
-      method: 'GET'
-    }).done(function (data) {
-      if (!data) {
-        self.UserData = {_id: '0000', login: 'guest'};
-      } else {
-        self.UserData = data;
-      }
-      if (itemId) { // This check is probably unnecessary
-        self.RequestGirderImageItem(itemId);
-      }
-    });
+    if (itemId) {
+      // Get a list of annotations and populate the button div.
+      // But first, get info about the user (to manage sharing).
+      var self = this;
+      girder.rest.restRequest({
+	url: 'user/me',
+	method: 'GET'
+      }).done(function (data) {
+	if (!data) {
+          self.UserData = {_id: '0000', login: 'guest'};
+	} else {
+          self.UserData = data;
+	}
+	if (itemId) { // This check is probably unnecessary
+          self.RequestGirderImageItem(itemId);
+	}
+      });
+    }
   };
 
   // Get a list of annotations and make the buttons.
@@ -629,13 +631,24 @@
       self.LoadGirderItemAnnotations(data);
     });
   };
+
+  // This is for my standalone viewer. I put all annotations into a single json file.
+  LayerPanel.prototype.LoadJSONAnnotations = function (annotation_info) {
+    let labels = Object.keys(annotation_info);
+    for (let i = 0; i < labels.length; ++i) {
+      let label = labels[i];
+      let layerGui = new SAM.AnnotationLayerGui(annotation_info[label], this);
+      this.LayerGuis.push(layerGui);
+    }
+  }
+
   // Just the meta data for the items.  Make buttons from the meta data.
   LayerPanel.prototype.LoadGirderItemAnnotations = function (data) {
     // TODO: Figure out the edit button (hide it if the user does not have access.)
     for (var i = 0; i < data.length; ++i) {
       var layerGui = new SAM.AnnotationLayerGui(data[i], this);
       this.LayerGuis.push(layerGui);
-    }
+    } 
 
     // If the user has write access, we need a default layerGui.
     // First we have to see if we have write access to the folder containing this item.

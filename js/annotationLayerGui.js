@@ -129,6 +129,10 @@
     this.DeleteButton = deleteButton;
     this.Name = metadata.annotation.name;
     this.Modified = false;
+    // Support for JSON annotation without girder.
+    if (metadata.annotation.hasOwnProperty('elements')) {
+      this.Data = metadata;
+    }
 
     // Block the viewer from getting events
     // when the buttons and toggles are pressed.
@@ -172,7 +176,7 @@
       });
 
     // The user can only activate his own annotations
-    if (metadata.creatorId === this.LayerPanel.UserData._id) {
+    if (this.LayerPanel.UserData != null && metadata.creatorId === this.LayerPanel.UserData._id) {
       this.EditNameOff();
       deleteButton.on(
         'click touchstart',

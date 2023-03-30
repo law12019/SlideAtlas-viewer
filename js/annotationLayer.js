@@ -291,6 +291,16 @@
       }
       return floatColor;
     }
+    // Deal with color in hex format i.e. #00f
+    if (typeof (color) === 'string' && color.length === 4 && color[0] === '#') {
+      var floatColor = [];
+      var idx = 1;
+      for (var i = 0; i < 3; ++i) {
+        var val = ((16.0 * SAM.HexDigitToInt(color[idx++]))) / 255.0;
+        floatColor.push(val);
+      }
+      return floatColor;
+    }
     if (typeof (color) === 'string') {
       // No other formats for now.
       console.error('Cannot decode color ' + color);
@@ -601,7 +611,7 @@
       distObj.value *= 1e3;
       return distObj.value;
     }
-    console.log('Unknown units: ' + distObj.units);
+    //console.log('Cannot convert ' + distObj.units + " to meters.");
     return distObj.value;
   };
 

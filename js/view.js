@@ -7,499 +7,502 @@
 (function () {
   'use strict';
 
-  function View (parent, useWebGL) {
-    this.Viewport = [0, 0, 100, 100];
+  class View {
+    constructor (parent, useWebGL) {
+      this.Viewport = [0, 0, 100, 100];
 
-    // Should widgets use shapes?
-    // Should views be used independently to viewers?
-    this.ShapeList = [];
+      // Should widgets use shapes?
+      // Should views be used independently to viewers?
+      this.ShapeList = [];
 
-    // connectome: remove Cache ivar.
-    this.Camera = new SAM.Camera();
-    this.OutlineColor = [0, 0.5, 0];
-    this.OutlineMatrix = mat4.create();
-    this.OutlineCamMatrix = mat4.create();
+      // connectome: remove Cache ivar.
+      this.Camera = new SAM.Camera();
+      this.OutlineColor = [0, 0.5, 0];
+      this.OutlineMatrix = mat4.create();
+      this.OutlineCamMatrix = mat4.create();
 
-    this.Parent = parent;
-    if (parent) {
       this.Parent = parent;
-    } else {
-      // USed for off screen rendering. (Can we depreciate off screen feature in girder viewer?)
-      this.Parent = $('<div>');
-    }
-    // 2d canvas
-    // Add a new canvas.
-    this.Canvas = $('<canvas>');
+      if (parent) {
+	this.Parent = parent;
+      } else {
+	// USed for off screen rendering. (Can we depreciate off screen feature in girder viewer?)
+	this.Parent = $('<div>');
+      }
+      // 2d canvas
+      // Add a new canvas.
+      this.Canvas = $('<canvas>');
 
-    if (!useWebGL) {
-      this.Context2d = this.Canvas[0].getContext('2d');
-    }
+      if (!useWebGL) {
+	this.Context2d = this.Canvas[0].getContext('2d');
+      }
 
-    this.Canvas
-      .appendTo(this.Parent)
-      .css({
-        'position': 'absolute',
-        'left': '0%',
-        'top': '0%',
-        'width': '100%',
-        'height': '100%'});
+      this.Canvas
+	.appendTo(this.Parent)
+	.css({
+          'position': 'absolute',
+          'left': '0%',
+          'top': '0%',
+          'width': '100%',
+          'height': '100%'});
 
-    this.Parent
-      .addClass('sa-view-canvas-div');
-  }
-
-  // Try to remove all global and circular references to this view.
-  View.prototype.Delete = function () {
-    this.Parent.off('mousedown.viewer');
-    this.Parent.off('mousemove.viewer');
-    this.Parent.off('wheel.viewer');
-    this.Parent.off('touchstart.viewer');
-    this.Parent.off('touchmove.viewer');
-    this.Parent.off('touchend.viewer');
-    this.Parent.off('keydown.viewer');
-    this.Parent.off('wheel.viewer');
-    delete this.ShapeList;
-    // delete this.Section;
-    delete this.Camera;
-    // delete this.Tiles;
-    delete this.Parent;
-    delete this.Canvas;
-  };
-
-  View.prototype.GetCamera = function () {
-    return this.Camera;
-  };
-
-  // For shared camera with viewer.
-  View.prototype.SetCamera = function (cam) {
-    this.Camera = cam;
-  };
-
-  // Get raw image data from the view.
-  View.prototype.GetImageData = function () {
-    // interesting: When does it need to be set?
-    // ctx.imageSmoothingEnabled = true;
-    // useful for debugging
-    // ctx.putImageData(imagedata, dx, dy);
-    var cam = this.Camera;
-    var width = Math.floor(cam.ViewportWidth);
-    var height = Math.floor(cam.ViewportHeight);
-    var ctx = this.Context2d;
-    var data = ctx.getImageData(0, 0, width, height);
-    data.Camera = new SAM.Camera();
-    data.Camera.DeepCopy(this.Camera);
-    // This will ne slow (wrapper class, or tack on methods)
-    Object.setPrototypeOf(data, new SAM.ImageData());
-    data.IncX = 4;
-    // Super has height and width which should be imutable.
-    data.width = width;
-    data.height = height;
-    data.IncY = data.IncX * data.width;
-    return data;
-  };
-
-  // Get the current scale factor between pixels and world units.
-  // World unit is the highest resolution image pixel.
-  // Returns the size of a world pixel in screen pixels.
-  // factor: screen/world
-  // The default world pixel = 0.25e-6 meters
-  View.prototype.GetPixelsPerUnit = function () {
-    // Determine the scale difference between the two coordinate systems.
-    var m = this.Camera.GetWorldMatrix();
-
-    // Convert from world coordinate to view (-1->1);
-    return 0.5 * this.Viewport[2] / (m[3] + m[15]); // m[3] for x, m[7] for height
-  };
-
-  View.prototype.HasUnits = function () {
-    var cache = this.GetCache();
-    if (!cache || !cache.Image || !cache.Image.units) { return false; }
-    return cache.Image.units !== 'Units';
-  };
-
-  View.prototype.GetMetersPerUnit = function () {
-    var cache = this.GetCache();
-    var dist;
-    if (!cache) {
-      dist = {value: 250,
-        units: 'nm'};
-    } else {
-      dist = {value: cache.Image.spacing[0],
-        units: cache.Image.units};
-    }
-    SAM.ConvertToMeters(dist);
-    return dist.value;
-  };
-
-  // TODO: Get rid of these since the user can manipulate the parent / canvas
-  // div which can be passed into the constructor.
-  // View.prototype.appendTo = function (j) {
-  //  return this.Parent.appendTo(j);
-  // };
-
-  // View.prototype.remove = function (j) {
-  //  return this.Parent.remove(j);
-  // };
-
-  // View.prototype.css = function (j) {
-  //  return this.Parent.css(j);
-  // };
-
-  // TODO: Get rid of this.
-  View.prototype.GetViewport = function () {
-    return this.Viewport;
-  };
-
-  View.prototype.GetWidth = function () {
-    return this.Parent.width();
-  };
-
-  View.prototype.GetHeight = function () {
-    return this.Parent.height();
-  };
-
-  View.prototype.UpdateSize = function () {
-    this.UpdateCanvasSize();
-  };
-
-  // The canvasDiv changes size, the width and height of the canvas and
-  // camera need to follow.  I am going to make this the resize callback.
-  View.prototype.UpdateCanvasSize = function () {
-    if (!this.Parent.is(':visible')) {
-      return false;
+      this.Parent
+	.addClass('sa-view-canvas-div');
     }
 
-    var pos = this.Parent.position();
-    // var width = this.Parent.innerWidth();
-    // var height = this.Parent.innerHeight();
-    var width = this.Parent.width();
-    var height = this.Parent.height();
-    // resizable is making width 0 intermitently ????
-    if (width <= 0 || height <= 0) { return false; }
-
-    this.SetViewport([pos.left, pos.top, width, height]);
-
-    return true;
-  };
-
-  // This is meant to be called internally by UpdateCanvasSize.
-  // However, if the parent(canvasDiv) is hidden, it might need to be
-  // set explcitly.
-  // TODO: Change this to simply width and height.
-  View.prototype.SetViewport = function (viewport) {
-    var width = viewport[2];
-    var height = viewport[3];
-
-    this.Canvas.attr('width', width.toString());
-    this.Canvas.attr('height', height.toString());
-
-    // TODO: Get rid of this ivar
-    this.Viewport = viewport;
-
-    // TODO: Just set the width and height of the camera.
-    // There is no reason, the camera needs to know the
-    // the position of the cameraDiv.
-    this.Camera.SetViewport(viewport);
-  };
-
-  View.prototype.CaptureImage = function () {
-    var url = this.Canvas[0].toDataURL();
-    var newImg = document.createElement('img'); // create
-    newImg.src = url;
-    return newImg;
-  };
-
-  // Legacy
-  // A list of shapes to render in the view
-  View.prototype.AddShape = function (shape) {
-    this.ShapeList.push(shape);
-  };
-
-  // NOTE: AnnotationLayer has the api where the shapes draw themselves (with
-  // reference to this view.  I like that better than the view knowing
-  // how to draw all these things.
-  View.prototype.DrawShapes = function () {
-    if (!this.Parent.is(':visible')) {
-      return;
+    // Try to remove all global and circular references to this view.
+    Delete () {
+      this.Parent.off('mousedown.viewer');
+      this.Parent.off('mousemove.viewer');
+      this.Parent.off('wheel.viewer');
+      this.Parent.off('touchstart.viewer');
+      this.Parent.off('touchmove.viewer');
+      this.Parent.off('touchend.viewer');
+      this.Parent.off('keydown.viewer');
+      delete this.ShapeList;
+      // delete this.Section;
+      delete this.Camera;
+      // delete this.Tiles;
+      delete this.Parent;
+      delete this.Canvas;
     }
-    for (var i = 0; i < this.ShapeList.length; i++) {
-      this.ShapeList[i].Draw(this);
+
+    GetCamera () {
+      return this.Camera;
     }
-  };
 
-  View.prototype.Clear = function () {
-    this.Context2d.save();
-    this.Context2d.setTransform(1, 0, 0, 1, 0, 0);
-    // TODO: get width and height from the canvas.
-    this.Context2d.clearRect(0, 0, this.Viewport[2], this.Viewport[3]);
-    this.Context2d.restore();
-  };
+    // For shared camera with viewer.
+    SetCamera (cam) {
+      this.Camera = cam;
+    }
 
-  View.prototype.DrawHistory = function (windowHeight) {
-    if (this.gl) {
-      alert('Drawing history does not work with webGl yet.');
-    } else {
-      var ctx = this.Context2d;
-      ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-      // Start with a transform that flips the y axis.
-      ctx.setTransform(1, 0, 0, -1, 0, this.Viewport[3]);
-
-      // Map (-1->1, -1->1) to the viewport.
-      // Origin of the viewport does not matter because drawing is relative
-      // to this view's canvas.
-      ctx.transform(0.5 * this.Viewport[2], 0.0,
-                          0.0, 0.5 * this.Viewport[3],
-                          0.5 * this.Viewport[2],
-                          0.5 * this.Viewport[3]);
-
-      // ctx.fillRect(0.0,0.1,0.5,0.5); // left, right, width, height
-
-      // The camera maps the world coordinate system to (-1->1, -1->1).
+    // Get raw image data from the view.
+    GetImageData () {
+      // interesting: When does it need to be set?
+      // ctx.imageSmoothingEnabled = true;
+      // useful for debugging
+      // ctx.putImageData(imagedata, dx, dy);
       var cam = this.Camera;
-      var m = cam.GetWorldMatrix();
-      var h = 1.0 / m[15];
-      ctx.transform(m[0] * h, m[1] * h,
-                    m[4] * h, m[5] * h,
-                    m[12] * h, m[13] * h);
-
-      var timeLine = SA.recorderWidget.TimeLine;
-      for (var i = 0; i < timeLine.length; ++i) {
-        cam = timeLine[i].ViewerRecords[0].Camera;
-        var height = cam.Height;
-        var width = cam.Width;
-        // camer roll is already in radians.
-        var c = Math.cos(cam.GetWorldRoll());
-        var s = Math.sin(cam.GetWorldRoll());
-        ctx.save();
-        // transform to put focal point at 0,0
-        var fp = cam.GetWorldFocalPoint();
-        ctx.transform(c, -s,
-                      s, c,
-                      fp[0], fp[1]);
-
-        // Compute the zoom factor for opacity.
-        var opacity = 2 * windowHeight / height;
-        if (opacity > 1.0) { opacity = 1.0; }
-
-        ctx.fillStyle = 'rgba(0,128,0,' + opacity + ')';
-        ctx.fillRect(-width / 2, -height / 2, width, height); // left, right, width, height
-        ctx.stroke();
-        ctx.restore();
-      }
-      ctx.restore();
-    }
-  };
-
-  // Draw a cross hair in the center of the view.
-  View.prototype.DrawFocalPoint = function () {
-    if (this.gl) {
-      alert('Drawing focal point does not work with webGl yet.');
-    } else {
-      var x = this.Viewport[2] * 0.5;
-      var y = this.Viewport[3] * 0.5;
+      var width = Math.floor(cam.ViewportWidth);
+      var height = Math.floor(cam.ViewportHeight);
       var ctx = this.Context2d;
-      ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.strokeStyle = 'rgba(255,255,200,100)';
-      ctx.fillStyle = 'rgba(0,0,50,100)';
-
-      ctx.beginPath();
-      ctx.fillRect(x - 30, y - 1, 60, 3);
-      ctx.rect(x - 30, y - 1, 60, 3);
-      ctx.fillRect(x - 1, y - 30, 3, 60);
-      ctx.rect(x - 1, y - 30, 3, 60);
-
-      var r = y / 2;
-      ctx.beginPath();
-      ctx.moveTo(x - r, y - r + 30);
-      ctx.lineTo(x - r, y - r);
-      ctx.lineTo(x - r + 30, y - r);
-      ctx.moveTo(x + r, y - r + 30);
-      ctx.lineTo(x + r, y - r);
-      ctx.lineTo(x + r - 30, y - r);
-      ctx.moveTo(x + r, y + r - 30);
-      ctx.lineTo(x + r, y + r);
-      ctx.lineTo(x + r - 30, y + r);
-      ctx.moveTo(x - r, y + r - 30);
-      ctx.lineTo(x - r, y + r);
-      ctx.lineTo(x - r + 30, y + r);
-      ctx.stroke();
-
-      ++r;
-      ctx.beginPath();
-      ctx.strokeStyle = 'rgba(0,0,50,100)';
-      ctx.moveTo(x - r, y - r + 30);
-      ctx.lineTo(x - r, y - r);
-      ctx.lineTo(x - r + 30, y - r);
-      ctx.moveTo(x + r, y - r + 30);
-      ctx.lineTo(x + r, y - r);
-      ctx.lineTo(x + r - 30, y - r);
-      ctx.moveTo(x + r, y + r - 30);
-      ctx.lineTo(x + r, y + r);
-      ctx.lineTo(x + r - 30, y + r);
-      ctx.moveTo(x - r, y + r - 30);
-      ctx.lineTo(x - r, y + r);
-      ctx.lineTo(x - r + 30, y + r);
-      ctx.stroke();
-      ctx.restore();
+      var data = ctx.getImageData(0, 0, width, height);
+      data.Camera = new SAM.Camera();
+      data.Camera.DeepCopy(this.Camera);
+      // This will ne slow (wrapper class, or tack on methods)
+      Object.setPrototypeOf(data, new SAM.ImageData());
+      data.IncX = 4;
+      // Super has height and width which should be imutable.
+      data.width = width;
+      data.height = height;
+      data.IncY = data.IncX * data.width;
+      return data;
     }
-  };
 
-  // Draw a cross hair at each correlation point.
-  // pointIdx is 0 or 1.  It indicates which correlation point should be drawn.
-  View.prototype.DrawCorrelations = function (correlations, pointIdx) {
-    if (this.gl) {
-      alert('Drawing correlations does not work with webGl yet.');
-    } else {
-      var ctx = this.Context2d;
-      ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.strokeStyle = 'rgba(200,255,255,100)';
-      ctx.fillStyle = 'rgba(255,0,0,100)';
-      for (var i = 0; i < correlations.length; ++i) {
-        var wPt = correlations[i].GetPoint(pointIdx);
-        var m = this.Camera.GetWorldMatrix();
-        // Change coordinate system from world to -1->1
-        var x = (wPt[0] * m[0] + wPt[1] * m[4] + m[12]) / m[15];
-        var y = (wPt[0] * m[1] + wPt[1] * m[5] + m[13]) / m[15];
-        // Transform coordinate system from -1->1 to canvas
-        x = (1.0 + x) * this.Viewport[2] * 0.5;
-        y = (1.0 - y) * this.Viewport[3] * 0.5;
+    // Get the current scale factor between pixels and world units.
+    // World unit is the highest resolution image pixel.
+    // Returns the size of a world pixel in screen pixels.
+    // factor: screen/world
+    // The default world pixel = 0.25e-6 meters
+    GetPixelsPerUnit () {
+      // Determine the scale difference between the two coordinate systems.
+      var m = this.Camera.GetWorldMatrix();
 
-        ctx.beginPath();
-        ctx.fillRect(x - 20, y - 1, 40, 3);
-        ctx.rect(x - 20, y - 1, 40, 3);
-        ctx.fillRect(x - 1, y - 20, 3, 40);
-        ctx.rect(x - 1, y - 20, 3, 40);
+      // Convert from world coordinate to view (-1->1);
+      return 0.5 * this.Viewport[2] / (m[3] + m[15]); // m[3] for x, m[7] for height
+    }
 
-        ctx.stroke();
+    HasUnits () {
+      var cache = this.GetCache();
+      if (!cache || !cache.Image || !cache.Image.units) { return false; }
+      return cache.Image.units !== 'Units';
+    }
+
+    GetMetersPerUnit () {
+      var cache = this.GetCache();
+      var dist;
+      if (!cache) {
+	dist = {value: 250,
+		units: 'nm'};
+      } else {
+	dist = {value: cache.Image.spacing[0],
+		units: cache.Image.units};
       }
-      ctx.restore();
+      SAM.ConvertToMeters(dist);
+      return dist.value;
     }
-  };
 
-  // NOTE: Not used anymore. Viewer uses a DOM.
-  View.prototype.DrawCopyright = function (copyright) {
-    if (copyright === undefined) {
-      return;
+    // TODO: Get rid of these since the user can manipulate the parent / canvas
+    // div which can be passed into the constructor.
+    // View.prototype.appendTo (j) {
+    //  return this.Parent.appendTo(j);
+    // };
+
+    // View.prototype.remove (j) {
+    //  return this.Parent.remove(j);
+    // };
+
+    // View.prototype.css (j) {
+    //  return this.Parent.css(j);
+    // };
+
+    // TODO: Get rid of this.
+    GetViewport () {
+      return this.Viewport;
     }
-    if (this.gl) {
-      // not implemented yet.
-    } else {
+
+    GetWidth () {
+      return this.Parent.width();
+    }
+
+    GetHeight () {
+      return this.Parent.height();
+    }
+
+    UpdateSize () {
+      this.UpdateCanvasSize();
+    }
+
+    // The canvasDiv changes size, the width and height of the canvas and
+    // camera need to follow.  I am going to make this the resize callback.
+    UpdateCanvasSize () {
+      if (!this.Parent.is(':visible')) {
+	return false;
+      }
+
+      var pos = this.Parent.position();
+      // var width = this.Parent.innerWidth();
+      // var height = this.Parent.innerHeight();
+      var width = this.Parent.width();
+      var height = this.Parent.height();
+      // resizable is making width 0 intermitently ????
+      if (width <= 0 || height <= 0) { return false; }
+
+      this.SetViewport([pos.left, pos.top, width, height]);
+
+      return true;
+    }
+
+    // This is meant to be called internally by UpdateCanvasSize.
+    // However, if the parent(canvasDiv) is hidden, it might need to be
+    // set explcitly.
+    // TODO: Change this to simply width and height.
+    SetViewport (viewport) {
+      var width = viewport[2];
+      var height = viewport[3];
+
+      this.Canvas.attr('width', width.toString());
+      this.Canvas.attr('height', height.toString());
+
+      // TODO: Get rid of this ivar
+      this.Viewport = viewport;
+
+      // TODO: Just set the width and height of the camera.
+      // There is no reason, the camera needs to know the
+      // the position of the cameraDiv.
+      this.Camera.SetViewport(viewport);
+    }
+
+    CaptureImage () {
+      var url = this.Canvas[0].toDataURL();
+      var newImg = document.createElement('img'); // create
+      newImg.src = url;
+      return newImg;
+    }
+
+    // Legacy
+    // A list of shapes to render in the view
+    AddShape (shape) {
+      this.ShapeList.push(shape);
+    }
+
+    // NOTE: AnnotationLayer has the api where the shapes draw themselves (with
+    // reference to this view.  I like that better than the view knowing
+    // how to draw all these things.
+    DrawShapes () {
+      if (!this.Parent.is(':visible')) {
+	return;
+      }
+      for (var i = 0; i < this.ShapeList.length; i++) {
+	this.ShapeList[i].Draw(this);
+      }
+    }
+
+    Clear () {
+      this.Context2d.save();
       this.Context2d.setTransform(1, 0, 0, 1, 0, 0);
-      this.Context2d.font = '18px Arial';
-      var x = this.Viewport[2] * 0.5 - 50;
-      var y = this.Viewport[3] - 10;
-      this.Context2d.fillStyle = 'rgba(128,128,128,0.5)';
-      this.Context2d.fillText(copyright, x, y);
-      // this.Context2d.strokeStyle = "rgba(255,255,255,0.5)";
-      // this.Context2d.strokeText(copyright,x,y);
-    }
-  };
+      // TODO: get width and height from the canvas.
+      this.Context2d.clearRect(0, 0, this.Viewport[2], this.Viewport[3]);
+      this.Context2d.restore();
+    };
 
-  // I think this was only used for webgl.  Not used anymore
-  View.prototype.DrawOutline = function (backgroundFlag) {
-    if (this.gl) {
-      var program = SA.polyProgram;
-      this.gl.useProgram(program);
+    DrawHistory (windowHeight) {
+      if (this.gl) {
+	alert('Drawing history does not work with webGl yet.');
+      } else {
+	var ctx = this.Context2d;
+	ctx.save();
+	ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-      this.gl.viewport(this.Viewport[0],
-                             this.Viewport[3] - this.Viewport[1],
-                             this.Viewport[2],
-                             this.Viewport[3]);
+	// Start with a transform that flips the y axis.
+	ctx.setTransform(1, 0, 0, -1, 0, this.Viewport[3]);
 
-      // Draw a line around the viewport, so move (0,0),(1,1) to (-1,-1),(1,1)
-      mat4.identity(this.OutlineCamMatrix);
-      this.OutlineCamMatrix[0] = 2.0; // width x
-      this.OutlineCamMatrix[5] = 2.0; // width y
-      this.OutlineCamMatrix[10] = 0;
-      this.OutlineCamMatrix[12] = -1.0;
-      this.OutlineCamMatrix[13] = -1.0;
-      var viewFrontZ = this.Camera.ZRange[0] + 0.001;
-      var viewBackZ = this.Camera.ZRange[1] - 0.001;
-      this.OutlineCamMatrix[14] = viewFrontZ; // front plane
+	// Map (-1->1, -1->1) to the viewport.
+	// Origin of the viewport does not matter because drawing is relative
+	// to this view's canvas.
+	ctx.transform(0.5 * this.Viewport[2], 0.0,
+                      0.0, 0.5 * this.Viewport[3],
+                      0.5 * this.Viewport[2],
+                      0.5 * this.Viewport[3]);
 
-      mat4.identity(this.OutlineMatrix);
+	// ctx.fillRect(0.0,0.1,0.5,0.5); // left, right, width, height
 
-      this.gl.uniformMatrix4fv(program.mvMatrixUniform, false, this.OutlineMatrix);
+	// The camera maps the world coordinate system to (-1->1, -1->1).
+	var cam = this.Camera;
+	var m = cam.GetWorldMatrix();
+	var h = 1.0 / m[15];
+	ctx.transform(m[0] * h, m[1] * h,
+                      m[4] * h, m[5] * h,
+                      m[12] * h, m[13] * h);
 
-      if (backgroundFlag) {
-        // White background fill
-        this.OutlineCamMatrix[14] = viewBackZ; // back plane
-        this.gl.uniformMatrix4fv(program.pMatrixUniform, false, this.OutlineCamMatrix);
-        this.gl.uniform3f(program.colorUniform, 1.0, 1.0, 1.0);
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, SA.squarePositionBuffer);
-        this.gl.vertexAttribPointer(program.vertexPositionAttribute,
-                                            SA.squarePositionBuffer.itemSize,
-                                            this.gl.FLOAT, false, 0, 0);
-        this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, SA.squarePositionBuffer.numItems);
+	var timeLine = SA.recorderWidget.TimeLine;
+	for (var i = 0; i < timeLine.length; ++i) {
+          cam = timeLine[i].ViewerRecords[0].Camera;
+          var height = cam.Height;
+          var width = cam.Width;
+          // camer roll is already in radians.
+          var c = Math.cos(cam.GetWorldRoll());
+          var s = Math.sin(cam.GetWorldRoll());
+          ctx.save();
+          // transform to put focal point at 0,0
+          var fp = cam.GetWorldFocalPoint();
+          ctx.transform(c, -s,
+			s, c,
+			fp[0], fp[1]);
+
+          // Compute the zoom factor for opacity.
+          var opacity = 2 * windowHeight / height;
+          if (opacity > 1.0) { opacity = 1.0; }
+
+          ctx.fillStyle = 'rgba(0,128,0,' + opacity + ')';
+          ctx.fillRect(-width / 2, -height / 2, width, height); //left, right, width, height
+          ctx.stroke();
+          ctx.restore();
+	}
+	ctx.restore();
       }
-
-      // outline
-      this.OutlineCamMatrix[14] = viewFrontZ; // force in front
-      this.gl.uniformMatrix4fv(program.pMatrixUniform, false, this.OutlineCamMatrix);
-      this.gl.uniform3f(program.colorUniform, this.OutlineColor[0], this.OutlineColor[1], this.OutlineColor[2]);
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, SA.squareOutlinePositionBuffer);
-      this.gl.vertexAttribPointer(program.vertexPositionAttribute,
-                                        SA.squareOutlinePositionBuffer.itemSize,
-                                        this.gl.FLOAT, false, 0, 0);
-      this.gl.drawArrays(this.gl.LINE_STRIP, 0, SA.squareOutlinePositionBuffer.numItems);
     }
-  };
 
-    // =================================================
-    // Extend the image data returned by the canvas.
+    // Draw a cross hair in the center of the view.
+    DrawFocalPoint () {
+      if (this.gl) {
+	alert('Drawing focal point does not work with webGl yet.');
+      } else {
+	var x = this.Viewport[2] * 0.5;
+	var y = this.Viewport[3] * 0.5;
+	var ctx = this.Context2d;
+	ctx.save();
+	ctx.setTransform(1, 0, 0, 1, 0, 0);
+	ctx.strokeStyle = 'rgba(255,255,200,100)';
+	ctx.fillStyle = 'rgba(0,0,50,100)';
 
-  function ImageData () {
-    this.IncX = 1;
-    this.IncY = 1;
+	ctx.beginPath();
+	ctx.fillRect(x - 30, y - 1, 60, 3);
+	ctx.rect(x - 30, y - 1, 60, 3);
+	ctx.fillRect(x - 1, y - 30, 3, 60);
+	ctx.rect(x - 1, y - 30, 3, 60);
+
+	var r = y / 2;
+	ctx.beginPath();
+	ctx.moveTo(x - r, y - r + 30);
+	ctx.lineTo(x - r, y - r);
+	ctx.lineTo(x - r + 30, y - r);
+	ctx.moveTo(x + r, y - r + 30);
+	ctx.lineTo(x + r, y - r);
+	ctx.lineTo(x + r - 30, y - r);
+	ctx.moveTo(x + r, y + r - 30);
+	ctx.lineTo(x + r, y + r);
+	ctx.lineTo(x + r - 30, y + r);
+	ctx.moveTo(x - r, y + r - 30);
+	ctx.lineTo(x - r, y + r);
+	ctx.lineTo(x - r + 30, y + r);
+	ctx.stroke();
+
+	++r;
+	ctx.beginPath();
+	ctx.strokeStyle = 'rgba(0,0,50,100)';
+	ctx.moveTo(x - r, y - r + 30);
+	ctx.lineTo(x - r, y - r);
+	ctx.lineTo(x - r + 30, y - r);
+	ctx.moveTo(x + r, y - r + 30);
+	ctx.lineTo(x + r, y - r);
+	ctx.lineTo(x + r - 30, y - r);
+	ctx.moveTo(x + r, y + r - 30);
+	ctx.lineTo(x + r, y + r);
+	ctx.lineTo(x + r - 30, y + r);
+	ctx.moveTo(x - r, y + r - 30);
+	ctx.lineTo(x - r, y + r);
+	ctx.lineTo(x - r + 30, y + r);
+	ctx.stroke();
+	ctx.restore();
+      }
+    }
+
+    // Draw a cross hair at each correlation point.
+    // pointIdx is 0 or 1.  It indicates which correlation point should be drawn.
+    DrawCorrelations (correlations, pointIdx) {
+      if (this.gl) {
+	alert('Drawing correlations does not work with webGl yet.');
+      } else {
+	var ctx = this.Context2d;
+	ctx.save();
+	ctx.setTransform(1, 0, 0, 1, 0, 0);
+	ctx.strokeStyle = 'rgba(200,255,255,100)';
+	ctx.fillStyle = 'rgba(255,0,0,100)';
+	for (var i = 0; i < correlations.length; ++i) {
+          var wPt = correlations[i].GetPoint(pointIdx);
+          var m = this.Camera.GetWorldMatrix();
+          // Change coordinate system from world to -1->1
+          var x = (wPt[0] * m[0] + wPt[1] * m[4] + m[12]) / m[15];
+          var y = (wPt[0] * m[1] + wPt[1] * m[5] + m[13]) / m[15];
+          // Transform coordinate system from -1->1 to canvas
+          x = (1.0 + x) * this.Viewport[2] * 0.5;
+          y = (1.0 - y) * this.Viewport[3] * 0.5;
+
+          ctx.beginPath();
+          ctx.fillRect(x - 20, y - 1, 40, 3);
+          ctx.rect(x - 20, y - 1, 40, 3);
+          ctx.fillRect(x - 1, y - 20, 3, 40);
+          ctx.rect(x - 1, y - 20, 3, 40);
+
+          ctx.stroke();
+	}
+	ctx.restore();
+      }
+    }
+
+    // NOTE: Not used anymore. Viewer uses a DOM.
+    DrawCopyright (copyright) {
+      if (copyright === undefined) {
+	return;
+      }
+      if (this.gl) {
+	// not implemented yet.
+      } else {
+	this.Context2d.setTransform(1, 0, 0, 1, 0, 0);
+	this.Context2d.font = '18px Arial';
+	var x = this.Viewport[2] * 0.5 - 50;
+	var y = this.Viewport[3] - 10;
+	this.Context2d.fillStyle = 'rgba(128,128,128,0.5)';
+	this.Context2d.fillText(copyright, x, y);
+	// this.Context2d.strokeStyle = "rgba(255,255,255,0.5)";
+	// this.Context2d.strokeText(copyright,x,y);
+      }
+    }
+
+    // I think this was only used for webgl.  Not used anymore
+    DrawOutline (backgroundFlag) {
+      if (this.gl) {
+	var program = SA.polyProgram;
+	this.gl.useProgram(program);
+
+	this.gl.viewport(this.Viewport[0],
+                         this.Viewport[3] - this.Viewport[1],
+                         this.Viewport[2],
+                         this.Viewport[3]);
+
+	// Draw a line around the viewport, so move (0,0),(1,1) to (-1,-1),(1,1)
+	mat4.identity(this.OutlineCamMatrix);
+	this.OutlineCamMatrix[0] = 2.0; // width x
+	this.OutlineCamMatrix[5] = 2.0; // width y
+	this.OutlineCamMatrix[10] = 0;
+	this.OutlineCamMatrix[12] = -1.0;
+	this.OutlineCamMatrix[13] = -1.0;
+	var viewFrontZ = this.Camera.ZRange[0] + 0.001;
+	var viewBackZ = this.Camera.ZRange[1] - 0.001;
+	this.OutlineCamMatrix[14] = viewFrontZ; // front plane
+
+	mat4.identity(this.OutlineMatrix);
+
+	this.gl.uniformMatrix4fv(program.mvMatrixUniform, false, this.OutlineMatrix);
+
+	if (backgroundFlag) {
+          // White background fill
+          this.OutlineCamMatrix[14] = viewBackZ; // back plane
+          this.gl.uniformMatrix4fv(program.pMatrixUniform, false, this.OutlineCamMatrix);
+          this.gl.uniform3f(program.colorUniform, 1.0, 1.0, 1.0);
+          this.gl.bindBuffer(this.gl.ARRAY_BUFFER, SA.squarePositionBuffer);
+          this.gl.vertexAttribPointer(program.vertexPositionAttribute,
+                                      SA.squarePositionBuffer.itemSize,
+                                      this.gl.FLOAT, false, 0, 0);
+          this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, SA.squarePositionBuffer.numItems);
+	}
+
+	// outline
+	this.OutlineCamMatrix[14] = viewFrontZ; // force in front
+	this.gl.uniformMatrix4fv(program.pMatrixUniform, false, this.OutlineCamMatrix);
+	this.gl.uniform3f(program.colorUniform, this.OutlineColor[0], this.OutlineColor[1], this.OutlineColor[2]);
+	this.gl.bindBuffer(this.gl.ARRAY_BUFFER, SA.squareOutlinePositionBuffer);
+	this.gl.vertexAttribPointer(program.vertexPositionAttribute,
+                                    SA.squareOutlinePositionBuffer.itemSize,
+                                    this.gl.FLOAT, false, 0, 0);
+	this.gl.drawArrays(this.gl.LINE_STRIP, 0, SA.squareOutlinePositionBuffer.numItems);
+      }
+    }
   }
+  
+  // =================================================
+  // Extend the image data returned by the canvas.
 
-  ImageData.prototype.GetIntensity = function (x, y) {
-    if (!this.data) { return 0; }
-    x = Math.round(x);
-    y = Math.round(y);
-    var idx = x * this.IncX + y * this.IncY;
-    return (this.data[idx] + this.data[idx + 1] + this.data[idx + 2]) / 3;
-  };
+  class ImageData {
+    constructor () {
+      this.IncX = 1;
+      this.IncY = 1;
+    }
 
-  ImageData.prototype.InBounds = function (x, y) {
+    GetIntensity (x, y) {
+      if (!this.data) { return 0; }
+      x = Math.round(x);
+      y = Math.round(y);
+      var idx = x * this.IncX + y * this.IncY;
+      return (this.data[idx] + this.data[idx + 1] + this.data[idx + 2]) / 3;
+    };
+
+    InBounds (x, y) {
     if (!this.data) { return false; }
     return (x >= 0 && x < this.width && y >= 0 && y < this.height);
   };
 
-  // Mark edges visited so we do not create the same contour twice.
-  // I cannot mark the pixel cell because two contours can go through the same cell.
-  // Note:  I have to keep track of both the edge and the direction the contour leaves
-  // the edge.  The backward direction was to being contoured because the starting
-  // edge was already marked.  The order of the points here matters.  Each point
-  // marks 4 edges.
-  ImageData.prototype.MarkEdge = function (x0, y0, x1, y1) {
-    if (!this.EdgeMarks) {
-      var numTemplates = Math.round((this.width) * (this.height));
-      this.EdgeMarks = new Array(numTemplates);
-      for (var i = 0; i < numTemplates; ++i) {
-        this.EdgeMarks[i] = 0;
+    // Mark edges visited so we do not create the same contour twice.
+    // I cannot mark the pixel cell because two contours can go through the same cell.
+    // Note:  I have to keep track of both the edge and the direction the contour leaves
+    // the edge.  The backward direction was to being contoured because the starting
+    // edge was already marked.  The order of the points here matters.  Each point
+    // marks 4 edges.
+    MarkEdge (x0, y0, x1, y1) {
+      if (!this.EdgeMarks) {
+	var numTemplates = Math.round((this.width) * (this.height));
+	this.EdgeMarks = new Array(numTemplates);
+	for (var i = 0; i < numTemplates; ++i) {
+          this.EdgeMarks[i] = 0;
+	}
       }
-    }
 
-    var edge = 0;
-    if (x0 !== x1) {
-      edge = (x0 < x1) ? 1 : 4;
-    } else if (y0 !== y1) {
-      edge = (y0 < y1) ? 2 : 8;
-    }
+      var edge = 0;
+      if (x0 !== x1) {
+	edge = (x0 < x1) ? 1 : 4;
+      } else if (y0 !== y1) {
+	edge = (y0 < y1) ? 2 : 8;
+      }
 
-    var idx = x0 + y0 * (this.width);
-    var mask = this.EdgeMarks[idx];
-    if (mask & edge) {
-      return true;
+      var idx = x0 + y0 * (this.width);
+      var mask = this.EdgeMarks[idx];
+      if (mask & edge) {
+	return true;
+      }
+      this.EdgeMarks[idx] = mask | edge;
+      return false;
     }
-    this.EdgeMarks[idx] = mask | edge;
-    return false;
-  };
+  }
 
   SAM.ImageData = ImageData;
   SAM.View = View;

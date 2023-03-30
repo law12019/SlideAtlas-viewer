@@ -548,7 +548,8 @@
                   self.Draw();
                   if (interaction) {
                     // Easiest place to make sure interaction events are triggered.
-                    self.TriggerInteraction();
+		    // Trying to track down scroll wheel crash.
+                    //self.TriggerInteraction();
                   }
                 });
     }
@@ -2373,15 +2374,16 @@
 
   Viewer.prototype.HandleMouseWheel = function (event) {
     if (!this.InteractionEnabled) { return true; }
-
+    let time_stamp = (new Date()).getTime();
     // Decay computations.
-    this.MouseTime = (new Date()).getTime();
+    this.MouseTime = time_stamp;
     if (this.LastMouseTime) {
       var dt = this.MouseTime - this.LastMouseTime;
       this.WheelSensitivity *= Math.exp(-dt / this.WheelTimeConstant);
       // console.log(dt);
     }
     this.LastMouseTime = this.MouseTime;
+    // Make the zoom go faster with a fast mouse wheel.
     this.WheelSensitivity += this.WheelAcceleration;
     if (this.WheelSensitivity > 0.2) {
       this.WheelSensitivity = 0.2;
@@ -2431,8 +2433,9 @@
 
     this.RollTarget = this.MainView.Camera.GetWorldRoll();
 
-    this.AnimateLast = new Date().getTime();
+    this.AnimateLast = time_stamp;
     this.AnimateDuration = 200.0; // hard code 200 milliseconds
+
     this.EventuallyRender(true);
     return false;
   };

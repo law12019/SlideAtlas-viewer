@@ -513,7 +513,7 @@
   };
 
   GridWidget.prototype.HandleMouseWheel = function (event) {
-        /*
+       /*
         var x = event.offsetX;
         var y = event.offsetY;
 
