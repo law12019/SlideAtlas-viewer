@@ -602,7 +602,8 @@
       distObj.value *= 1e-1;
       return distObj.value;
     }
-    if (distObj.units.toLowerCase() === 'm') {
+    if (distObj.units.toLowerCase() === 'm' ||
+	distObj.units.toLowerCase() === 'meters') {
       distObj.units = 'm';
       return distObj.value;
     }

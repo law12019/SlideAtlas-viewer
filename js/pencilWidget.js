@@ -311,8 +311,6 @@
     }
 
     // Shapes use [1,1,1] instead of hex color. Really!!!
-
-    var outlineColor = this.Color;
     if (obj.lineColor) {
       this.Color = obj.lineColor;
     }
@@ -327,7 +325,7 @@
           this.Mode = OPEN;
         }
       }
-      shape.SetOutlineColor(outlineColor);
+      shape.SetOutlineColor(this.Color);
       shape.FixedSize = false;
       shape.LineWidth = this.LineWidth;
       if (this.Mode === CLOSED) {

@@ -28,7 +28,7 @@
     this.LayerGuis = [];
     this.ModifiedCount = 0;
     this.EditingLayerGui = undefined;
-
+    
     this.Viewer.ScaleOn();
 
     // Because of loading on demand, the easiest way to restore
@@ -638,6 +638,8 @@
     for (let i = 0; i < labels.length; ++i) {
       let label = labels[i];
       let layerGui = new SAM.AnnotationLayerGui(annotation_info[label], this);
+      // Default to visible since all annotation are loaded up front.
+      layerGui.VisibilityOn();      
       this.LayerGuis.push(layerGui);
     }
   }

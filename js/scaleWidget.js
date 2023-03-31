@@ -65,6 +65,7 @@
   };
 
   function ScaleWidget () {
+    this.ScreenLength = 0;
     this.PixelsPerMeter = 0;
     this.Shape = new Scale();
     this.Shape.OutlineColor = [0.0, 0.0, 0.0];
@@ -85,29 +86,36 @@
   }
 
   // Change the length of the scale based on the camera.
+  // Note: This only uses units meters and will not handle feet ...
   ScaleWidget.prototype.Update = function (view) {
     if (!view) { return; }
     // Compute the number of screen pixels in a meter.
-    var scale = Math.round(
-      view.GetPixelsPerUnit() / view.GetMetersPerUnit());
-    if (this.PixelsPerMeter === scale) {
-      return;
-    }
+    let screenPixelsPerMeter = view.GetPixelsPerUnit() / view.GetMetersPerUnit();
 
-    // Save the scale so we know when to regenerate.
-    this.PixelsPerMeter = scale;
-    var target = 200; // pixels
-    var e = 0;
-        // Note: this assumes max bin length is 1 meter.
-    var binLengthViewer = this.PixelsPerMeter;
-        // keep reducing the length until it is reasonable.
-    while (binLengthViewer > target) {
-      binLengthViewer = binLengthViewer / 10;
+    // Choose a bin/tick length which is a power of 10 of our units.
+    // start with 1 meter bins
+    let e = 0;
+    let binLength = screenPixelsPerMeter; // in screen pixels.
+    let maxBinLength = 200; // screen pixels
+    let minBinLength = 20; // screen pixels
+    while (binLength < minBinLength) {
+      binLength = binLength * 10;
+      ++e;
+    } 
+    while (binLength > maxBinLength) {
+      binLength = binLength / 10;
       --e;
     }
+    this.Shape.NumberOfBins = Math.floor(maxBinLength / binLength);
+    var screenLength = Math.round(binLength * this.Shape.NumberOfBins);
+    if (screenLength === this.ScreenLength) {
+      return;
+    }
+    this.ScreenLength = screenLength;
+
     // Now compute the units from e.
     this.Units = 'nm';
-    var factor = 1e-9;
+    let factor = 1e-9;
     if (e >= -6) {
       this.Units = '\xB5m';
       factor = 1e-6;
@@ -128,27 +136,20 @@
       this.Units = 'km';
       factor = 1000;
     }
-    // Length is set to the viewer pixel length of a tick / unit.
-    this.Shape.BinLength = binLengthViewer;
-    // Now add bins to get close to the target length.
-    this.Shape.NumberOfBins = Math.floor(target / binLengthViewer);
+
+    this.Shape.BinLength = binLength;
     // compute the length of entire scale bar (units: viewer pixels).
-    var scaleLengthViewer = binLengthViewer * this.Shape.NumberOfBins;
-    var scaleLengthMeters = scaleLengthViewer / this.PixelsPerMeter;
+    var scaleLengthMeters = this.Shape.NumberOfBins * Math.pow(10,e);
     // Compute the label.
     // The round should not change the value, only get rid of numerical error.
     var labelNumber = Math.round(scaleLengthMeters / factor);
     this.Label = labelNumber.toString() + this.Units;
 
-    // Save the length of the scale bar in world units.
-    // World (highest res image) pixels default to 0.25e-6 meters.
-    this.LengthWorld = scaleLengthMeters * 4e6;
-
     // Update the label text and position
     this.Text.String = this.Label;
     this.Text.UpdateBuffers(view);
-    this.Text.Position = [this.Shape.Origin[0] + (scaleLengthViewer / 2),
-      this.Shape.Origin[1] - 15];
+    this.Text.Position = [this.Shape.Origin[0] + (screenLength / 2) - 20,
+			  this.Shape.Origin[1] - 15];
 
     this.Shape.UpdateBuffers(view);
   };

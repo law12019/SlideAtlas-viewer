@@ -192,6 +192,10 @@
         self.VisibilityOn();
       });
     }
+    // Hack to hide edit button for stand alone usage.
+    if ( ! layerPanel.ItemId) {
+      self.EditToggle.hide();
+    }
   }
 
   AnnotationLayerGui.prototype.MakeAnnotationLayer = function (viewer) {
