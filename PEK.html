@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
+  <script src="src/gl-matrix-min.js"></script>
+  <link rel="stylesheet" href="slideatlas/sa.css">
+  <script src="slideatlas/sa-all.max.js"></script>
+
+  <style>
+    body {
+	margin: 0px;
+    }
+    #viewer {
+	height: 100vh;
+	width: 100%;
+	margin: 0px;
+    }
+  </style>    
+</head>
+  
+<body onload="sa_main();">
+
+<div id="viewer">
+</div>
+
+
+<script>
+  class DirTileSource {
+      constructor (image_path, image_info) {
+	  this.imagePath = image_path;
+	  this.width = image_info.width;
+	  this.height = image_info.height;
+	  this.tileWidth = image_info.tile_width;
+	  this.tileHeight = image_info.tile_height;
+	  this.minLevel = 0;
+	  this.maxLevel = image_info.max_level;
+	  this.units = image_info.units;
+	  this.spacing = [image_info.x_sample, image_info.y_sample];
+      }
+	  
+      getTileUrl (level, x, y, z) {
+          // level 0 is zoomed all in (leaf tiles).
+          return `${this.imagePath}/${level}/${x}/${y}.jpg`;
+      }
+  };
+
+
+  function sa_main() {
+      var viewer_parent = window.$('#viewer');
+      let image_path = "img/PEK";
+      $.ajax({
+          url: `${image_path}/info.json`,
+          dataType: 'application/json',
+          complete: function (data) {
+	      let image_info = JSON.parse(data.responseText);
+	      createViewer(viewer_parent, image_path, image_info);
+          }
+      });
+  }
+
+
+  function createViewer(viewer_parent, image_path, image_info) {
+      var tileSource = new DirTileSource(image_path, image_info);
+      window.SA.SAViewer(viewer_parent, {
+          zoomWidget: true,
+          prefixUrl: 'slideatlas/img/',
+          tileSource: tileSource
+      });
+      var viewer = viewer_parent[0].saViewer;
+      
+      // Create the annotation GUI
+      var annotationGui = new window.SAM.AnnotationViewer(viewer, false);
+      //var annotationGui = new window.SAM.LayerPanel(viewer, false);
+      viewer_parent.css({position: 'relative'});
+      // Get the annotation json.
+      $.ajax({
+          url: `${image_path}/annotation.json`,
+          dataType: 'application/json',
+          complete: function (data) {
+              annotationGui.LoadJSONAnnotations(JSON.parse(data.responseText));
+          }
+      });
+  }
+
+</script>
+
+
+
+
+</body>
+</html>
