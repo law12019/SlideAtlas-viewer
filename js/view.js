@@ -158,26 +158,13 @@
       return this.Parent.height();
     }
 
-    UpdateSize () {
-      this.UpdateCanvasSize();
-    }
-
     // The canvasDiv changes size, the width and height of the canvas and
     // camera need to follow.  I am going to make this the resize callback.
-    UpdateCanvasSize () {
+    UpdateCanvasSize (viewport) {
       if (!this.Parent.is(':visible')) {
 	return false;
       }
-
-      var pos = this.Parent.position();
-      // var width = this.Parent.innerWidth();
-      // var height = this.Parent.innerHeight();
-      var width = this.Parent.width();
-      var height = this.Parent.height();
-      // resizable is making width 0 intermitently ????
-      if (width <= 0 || height <= 0) { return false; }
-
-      this.SetViewport([pos.left, pos.top, width, height]);
+      this.SetViewport(viewport);
 
       return true;
     }

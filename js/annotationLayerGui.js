@@ -6,10 +6,10 @@
   'use strict';
 
   // This is a helper object that manages one annoation layer.
-  function AnnotationLayerGui (metadata, layerPanel) {
+  function AnnotationLayerGui (metadata, annotationViewer) {
     // This is needed because EditOn, has to turn off any other layers editing.
-    this.LayerPanel = layerPanel;
-    this.Viewer = this.LayerPanel.Viewer;
+    this.AnnotationViewer = annotationViewer;
+    this.TileViewer = this.AnnotationViewer.GetTileViewer();
     // Only widgets in a single layer can be selected at the same time.
     this.SelectedWidgets = [];
 
@@ -20,13 +20,9 @@
       this.ButtonSize = '24px';
     }
 
-    // For now, users can only see their own annotations.
-    // if (metadata.creatorId !== this.LayerPanel.UserData._id) {
-    //  return;
-    // }
     var self = this;
     var div = $('<div>')
-      .appendTo(layerPanel.ButtonDiv)
+      .appendTo(annotationViewer.ButtonDiv)
       .css({
         'display': 'table',
         'min-width': (2 * this.Radius) + 'px',
@@ -176,7 +172,8 @@
       });
 
     // The user can only activate his own annotations
-    if (this.LayerPanel.UserData != null && metadata.creatorId === this.LayerPanel.UserData._id) {
+    if (this.AnnotationViewer.UserData != null &&
+	metadata.creatorId === this.AnnotationViewer.UserData._id) {
       this.EditNameOff();
       deleteButton.on(
         'click touchstart',
@@ -187,13 +184,13 @@
     }
 
     // Restore any visible annotations from a previous session.
-    if (this.LayerPanel.LocalStorageVisibleAnnotationNames.indexOf(this.Name) > -1) {
+    if (this.AnnotationViewer.LocalStorageVisibleAnnotationNames.indexOf(this.Name) > -1) {
       this.AfterLoad(function () {
         self.VisibilityOn();
       });
     }
     // Hack to hide edit button for stand alone usage.
-    if ( ! layerPanel.ItemId) {
+    if ( ! annotationViewer.ItemId) {
       self.EditToggle.hide();
     }
   }
@@ -213,7 +210,7 @@
     annotationLayer.ScaleWidget.View = this.MainView;
     // Hack only used for girder testing.
     annotationLayer.SetViewer(viewer);
-    annotationLayer.UpdateSize();
+    //annotationLayer.UpdateSize();
     this.Layer = annotationLayer;
 
     // I am not sure that this is still used.
@@ -226,14 +223,14 @@
 
   AnnotationLayerGui.prototype.GetToolPanel = function () {
     if (!this.ToolPanel) {
-      if (this.Name === this.LayerPanel.GetDefaultLayerName()) {
-        this.ToolPanel = this.LayerPanel.DefaultToolPanel;
+      if (this.Name === this.AnnotationViewer.GetDefaultLayerName()) {
+        this.ToolPanel = this.AnnotationViewer.DefaultToolPanel;
       } else if (this.Data.annotation.elements.length > 0 &&
           this.Data.annotation.elements[0].user &&
           this.Data.annotation.elements[0].user.imageUrl) {
-        this.ToolPanel = new SAM.MaskToolPanel(this.LayerPanel);
+        this.ToolPanel = new SAM.MaskToolPanel(this.AnnotationViewer);
       } else {
-        this.ToolPanel = new SAM.AnnotationToolPanel(this.LayerPanel);
+        this.ToolPanel = new SAM.AnnotationToolPanel(this.AnnotationViewer);
       }
       this.ToolPanel.SetLayerGui(this);
     }
@@ -266,7 +263,7 @@
     this.DeleteButton.show();
 
     // Turn the new on on.
-    this.LayerPanel.SetEditingLayerGui(this);
+    this.AnnotationViewer.SetEditingLayerGui(this);
     // Change the color of the GUI.
     this.Div.css({'background-color': this.ActiveColor});
     // Make the markup visible
@@ -301,9 +298,9 @@
     // Hide the delete button
     this.DeleteButton.hide();
     // Turn the background to the default.
-    if (this.LayerPanel.EditingLayerGui === this) {
+    if (this.AnnotationViewer.EditingLayerGui === this) {
       this.Div.css({'background-color': this.DefaultColor});
-      this.LayerPanel.SetEditingLayerGui(undefined);
+      this.AnnotationViewer.SetEditingLayerGui(undefined);
     }
 
     this.UpdateToolVisibility();
@@ -314,11 +311,11 @@
     if (!this.Modified) {
       // For wanr when leaing page with modified annotations.
       // I do not think the count is necessary.
-      this.LayerPanel.ModifiedCount += 1; // ????
+      this.AnnotationViewer.ModifiedCount += 1; // ????
     }
     this.Modified = true;
     // Change the background color of the edit toggle to show that is is modified.
-    if (this.LayerPanel.UserData.login !== 'guest') {
+    if (this.AnnotationViewer.UserData.login !== 'guest') {
       this.EditToggle.css({'background-color': '#F55'});
     }
 
@@ -330,7 +327,7 @@
     }
 
     window.onbeforeunload = function (event) {
-      console.log('Leaving page ' + self.LayerPanel.ModifiedCount);
+      console.log('Leaving page ' + self.AnnotationViewer.ModifiedCount);
       return true;
     };
   };
@@ -345,7 +342,7 @@
     this.DisplayAnnotation();
 
     // Record the visibility of this annotation in local storage.
-    this.LayerPanel.SaveVisibilityInLocalStorage();
+    this.AnnotationViewer.SaveVisibilityInLocalStorage();
   };
 
   AnnotationLayerGui.prototype.VisibilityOff = function () {
@@ -360,7 +357,7 @@
     // Editing annots must be visible.
     this.EditOff();
     // Record the visibility of this annotation in local storage.
-    this.LayerPanel.SaveVisibilityInLocalStorage();
+    this.AnnotationViewer.SaveVisibilityInLocalStorage();
   };
 
   // There are two modes for name editing.  This is the inner mode.
@@ -371,13 +368,13 @@
 
     // Get rid of the events blocking viewer interaction
     // but also blocking content editable.
-    this.Viewer.InteractionOff();
+    this.TileViewer.InteractionOff();
     this.NameButton.off();
     this.NameButton.attr('tabindex', '1');
     // Sometimes the leave even does not fire, and the viewer appears non functional
-    this.LayerPanel.Div.on('mousedown.namebutton', function () { self.EditNameOff(); });
-    this.LayerPanel.Div.on('mouseleave.namebutton', function () { self.EditNameOff(); });
-    this.Viewer.GetDiv().on('mousedown.namebutton', function () { self.EditNameOff(); });
+    this.AnnotationViewer.Div.on('mousedown.namebutton', function () { self.EditNameOff(); });
+    this.AnnotationViewer.Div.on('mouseleave.namebutton', function () { self.EditNameOff(); });
+    this.TileViewer.GetDiv().on('mousedown.namebutton', function () { self.EditNameOff(); });
 
     this.NameButton
       .attr('contentEditable', true);
@@ -396,11 +393,11 @@
       this.AnnotationModified();
     }
 
-    this.Viewer.InteractionOn();
+    this.TileViewer.InteractionOn();
 
-    this.LayerPanel.Div.off('mousedown.namebutton');
-    this.LayerPanel.Div.off('mouseleave.namebutton');
-    this.Viewer.GetDiv().off('mousedown.namebutton');
+    this.AnnotationViewer.Div.off('mousedown.namebutton');
+    this.AnnotationViewer.Div.off('mouseleave.namebutton');
+    this.TileViewer.GetDiv().off('mousedown.namebutton');
 
     this.NameButton
       .attr('contentEditable', false)
@@ -414,8 +411,8 @@
     this.NameButton.on('mousedown mousemove mouseup touchstart touchend',
                        function () { return false; });
 
-    if (this.Name !== this.LayerPanel.GetDefaultLayerName()) {
-      this.LayerPanel.InitializeDefaultToolPanel();
+    if (this.Name !== this.AnnotationViewer.GetDefaultLayerName()) {
+      this.AnnotationViewer.InitializeDefaultToolPanel();
     }
   };
 
@@ -447,14 +444,14 @@
 
   // Call back from deleteButton.
   AnnotationLayerGui.prototype.DeleteCallback = function () {
-    if (!this.LayerPanel.EditingLayerGui) {
+    if (!this.AnnotationViewer.EditingLayerGui) {
       return;
     }
     this.Delete();
   };
 
   AnnotationLayerGui.prototype.Delete = function () {
-    if (!this.LayerPanel.EditingLayerGui.Layer.IsSelected()) {
+    if (!this.AnnotationViewer.EditingLayerGui.Layer.IsSelected()) {
       if (!confirm('Do you want to delete the entire annotation group?' + this.Name)) {
         return;
       }
@@ -495,8 +492,8 @@
     // Remove the buttons
     this.Div.remove();
     // Take it out of the annotation panel.
-    var idx = this.LayerPanel.LayerGuis.indexOf(this);
-    this.LayerPanel.LayerGuis.splice(idx, 1);
+    var idx = this.AnnotationViewer.LayerGuis.indexOf(this);
+    this.AnnotationViewer.LayerGuis.splice(idx, 1);
   };
 
   // TODO: Load annotations into a 'group'.  Manage separate groups.
@@ -504,7 +501,7 @@
   AnnotationLayerGui.prototype.DisplayAnnotation = function () {
     // If there is no layer, we have to create one
     if (!this.Layer) {
-      var layer = this.MakeAnnotationLayer(this.Viewer);
+      var layer = this.MakeAnnotationLayer(this.TileViewer);
       layer.Reset();
 
       // Put all the rectangles into one set.
@@ -542,7 +539,7 @@
           // I could have a callback.
           // I could also make a $('.sa-viewer').EventuallyRender();
           // or $('.sa-viewer').saViewer('EventuallyRender');
-          if (this.Layer.Viewer) {
+          if (this.Layer.GetViewer()) {
             this.Layer.Viewer.EventuallyRender();
           }
         }
@@ -664,7 +661,7 @@
       }
       // A new annotation
       girder.rest.restRequest({
-        url: 'annotation?itemId=' + this.LayerPanel.ItemId,
+        url: 'annotation?itemId=' + this.AnnotationViewer.ItemId,
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(this.Data.annotation)
@@ -691,12 +688,12 @@
   // Called when the annotation is saved successfully..
   AnnotationLayerGui.prototype.AnnotationSaved = function () {
     if (this.Modified) {
-      this.LayerPanel.ModifiedCount -= 1; // ???
+      this.AnnotationViewer.ModifiedCount -= 1; // ???
     }
     this.Modified = false;
     this.Div.css({'border': '1px solid #666'});
     this.EditToggle.css({'background-color': '#FFF'});
-    if (this.LayerPanel.ModifiedCount === 0) {
+    if (this.AnnotationViewer.ModifiedCount === 0) {
       window.onbeforeunload = undefined;
     }
   };
@@ -877,7 +874,7 @@
       tools = this.GetToolPanel();
       tools.HighlightRadioToolButton(tools.CursorButton);
       // See if we can move this to CursorOn
-      this.Viewer.EventuallyRender();
+      this.TileViewer.EventuallyRender();
       tools.UpdateToolVisibility();
       return true;
     }

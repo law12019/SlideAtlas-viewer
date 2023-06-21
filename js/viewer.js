@@ -93,14 +93,14 @@
     // necesary to respond to keyevents.
     this.MainView.Parent.attr('tabindex', '1');
 
-    this.Layers = [];
+    this.Viewers = [];
 
     if (!SAM.detectMobile() || SAM.MOBILE_DEVICE === 'iPad') {
       this.OverViewVisibility = true;
       this.OverViewScale = 0.02; // Experimenting with scroll
       this.OverViewport = [80, 20, 180, 180];
       this.OverViewDiv = $('<div>')
-                .appendTo(this.Div);
+        .appendTo(this.Div);
 
       this.OverView = new SA.TileView(this.OverViewDiv);
       this.OverView.Camera.ZRange = [-1, 0];
@@ -381,9 +381,10 @@
     */
   };
 
-  // Layers have a Draw(masterView) method.
-  Viewer.prototype.AddLayer = function (layer) {
-    this.Layers.push(layer);
+  // Viewers have a Draw(masterView) method.
+  // Right now the only viewer I have is the AnnotationViewer.
+  Viewer.prototype.AddChildViewer = function (childViewer) {
+    this.Viewers.push(childViewer);
   };
 
   // Abstracting saViewer  for viewer and dualViewWidget.
@@ -393,11 +394,9 @@
     note.ViewerRecords[viewIdx].CopyViewer(this);
   };
 
-  // TODO: Make the annotation layer optional.
   // I am moving some of the saViewer code into this viewer object because
   // I am trying to abstract the single viewer used for the HTML presentation
   // note and the full dual view / stack note.
-  // TODO: Make an alternative path that does not require a note.
   Viewer.prototype.ProcessArguments = function (args) {
     if (args.overview !== undefined) {
       this.SetOverViewVisibility(args.overview);
@@ -474,14 +473,6 @@
         this.UpdateCamera();
       }
     }
-
-    // TODO: Get rid of this hack.
-    if (this.AnnotationWidget && viewerRecord.AnnotationVisibility !== undefined) {
-      this.AnnotationWidget.SetVisibility(viewerRecord.AnnotationVisibility);
-    }
-
-    // fit the canvas to the div size.
-    this.UpdateSize();
   };
 
   Viewer.prototype.SetNote = function (note, viewIdx, lockCamera) {
@@ -636,17 +627,27 @@
   // onresize callback.  Canvas width and height and the camera need
   // to be synchronized with the canvas div.
   Viewer.prototype.UpdateSize = function () {
-    if (!this.MainView) {
-      return;
+    let parent = this.Div;
+    if ( ! parent.is(':visible')) {
+      return false;
     }
-    if (this.MainView.UpdateCanvasSize()) {
-      this.EventuallyRender();
+    let pos = parent.position();
+    let width = parent.width();
+    let height = parent.height();
+    // resizable is making width 0 intermitently ????
+    if (width <= 0 || height <= 0) { return false; }
+    let viewport =[pos.left, pos.top, width, height];
+
+    if (this.MainView) {
+      this.MainView.UpdateCanvasSize(viewport);
     }
 
-    for (var i = 0; i < this.Layers.length; ++i) {
-      var layer = this.Layers[i];
-      if (layer && layer.UpdateSize) {
-        layer.UpdateSize();
+    // I am not sure how we could have multiple childViewers. There is one childViewer for all annotation.
+    // TODO: Clean up the multiple levels of childViewers and make better names.
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      var childViewer = this.Viewers[i];
+      if (childViewer && childViewer.UpdateCanvasSize) {
+        childViewer.UpdateCanvasSize(viewport);
       }
     }
 
@@ -654,8 +655,8 @@
     // this overview.  It should be like other widgets
     // and be placed relative to the parent.
     if (this.OverView) {
-      var width = this.MainView.GetWidth();
-      var height = this.MainView.GetHeight();
+      //var width = this.MainView.GetWidth();
+      //var height = this.MainView.GetHeight();
       var area = width * height;
       var bounds = this.GetOverViewBounds();
       var aspect = (bounds[1] - bounds[0]) / (bounds[3] - bounds[2]);
@@ -681,8 +682,22 @@
         'top': this.OverViewport[1] + 'px',
         'height': this.OverViewport[3] + 'px'
       });
-      this.OverView.UpdateCanvasSize();
+      parent = this.OverViewDiv;
+      if ( ! parent.is(':visible')) {
+	return false;
+      }
+      pos = parent.position();
+      width = parent.width();
+      height = parent.height();
+      // resizable is making width 0 intermitently ????
+      if (width > 0 && height > 0) {
+	viewport = [pos.left, pos.top, width, height];
+	this.OverView.UpdateCanvasSize(viewport);
+      }
     }
+    this.EventuallyRender();
+
+
   };
 
   // TODO: Events are a pain because most are handled by parent.
@@ -926,9 +941,9 @@
     }
     this.MainView.DrawShapes();
 
-    for (var i = 0; i < this.Layers.length; ++i) {
-      if (this.Layers[i].Draw) {
-        this.Layers[i].Draw(view);
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      if (this.Viewers[i].Draw) {
+        this.Viewers[i].Draw(view);
       }
     }
 
@@ -1352,9 +1367,9 @@
       this.EventuallyRender();
     }
 
-    for (var i = 0; i < this.Layers.length; ++i) {
-      if (this.Layers[i].Draw) {
-        this.Layers[i].Draw(this.MainView);
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      if (this.Viewers[i].Draw) {
+        this.Viewers[i].Draw(this.MainView);
       }
     }
 
@@ -1416,15 +1431,15 @@
     this.SetCache(null);
     this.MainView.ShapeList = [];
 
-    for (var i = 0; i < this.Layers.length; ++i) {
-      if (this.Layers[i].Reset) {
-        this.Layers[i].Reset();
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      if (this.Viewers[i].Reset) {
+        this.Viewers[i].Reset();
       }
-      if (this.Layers[i].Remove) {
-        this.Layers[i].Remove();
+      if (this.Viewers[i].Remove) {
+        this.Viewers[i].Remove();
       }
     }
-    this.Layers = [];
+    this.Viewers = [];
   };
 
   // A list of shapes to render in the viewer
@@ -1648,10 +1663,10 @@
     this.HandleTouch(event, true);
     this.StartTouchTime = this.Time;
 
-    // Let the annotation layers have first dibs on processing the event.
-    for (var i = 0; i < this.Layers.length; ++i) {
-      var layer = this.Layers[i];
-      if (layer.HandleTouchStart && !layer.HandleTouchStart(event)) {
+    // Let the annotation childViewers have first dibs on processing the event.
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      var childViewer = this.Viewers[i];
+      if (childViewer.HandleTouchStart && ! childViewer.HandleTouchStart(event)) {
         return false;
       }
     }
@@ -1707,10 +1722,10 @@
     }
     */
 
-    // Let the annotation layers have first dibs on processing the event.
-    for (var i = 0; i < this.Layers.length; ++i) {
-      var layer = this.Layers[i];
-      if (layer.HandleTouchMove && !layer.HandleTouchMove(event)) {
+    // Let the annotation childViewers have first dibs on processing the event.
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      var childViewer = this.Viewers[i];
+      if (childViewer.HandleTouchMove && ! childViewer.HandleTouchMove(event)) {
         return false;
       }
     }
@@ -1747,11 +1762,11 @@
       return;
     }
 
-    // Let the annotation layers have first dibs on processing the event.
+    // Let the annotation childViewers have first dibs on processing the event.
     // TODO Either forward primary or secondary events.
-    for (var i = 0; i < this.Layers.length; ++i) {
-      var layer = this.Layers[i];
-      if (layer.HandleTouchPan && !layer.HandleTouchPan(event)) {
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      var childViewer = this.Viewers[i];
+      if (childViewer.HandleTouchPan && !childViewer.HandleTouchPan(event)) {
         return false;
       }
     }
@@ -1948,9 +1963,9 @@
     }
 
     // Let the annotation layers have first dibs on processing the event.
-    for (var i = 0; i < this.Layers.length; ++i) {
-      var layer = this.Layers[i];
-      if (layer.HandleTouchEnd && !layer.HandleTouchEnd(event)) {
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      var childViewer = this.Viewers[i];
+      if (childViewer.HandleTouchEnd && !childViewer.HandleTouchEnd(event)) {
         return false;
       }
     }
@@ -2105,9 +2120,9 @@
     if (!this.InteractionEnabled) { return true; }
 
     // Let the annotation layers have first dibs on processing the event.
-    for (var i = 0; i < this.Layers.length; ++i) {
-      var layer = this.Layers[i];
-      if (layer.HandleMouseClick && !layer.HandleMouseClick(event)) {
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      var childViewer = this.Viewers[i];
+      if (childViewer.HandleMouseClick && !childViewer.HandleMouseClick(event)) {
         return false;
       }
     }
@@ -2139,9 +2154,9 @@
     }
 
     // Let the annotation layers have first dibs on processing the event.
-    for (var i = 0; i < this.Layers.length; ++i) {
-      var layer = this.Layers[i];
-      if (layer.HandleMouseDown && !layer.HandleMouseDown(event)) {
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      var childViewer = this.Viewers[i];
+      if (childViewer.HandleMouseDown && ! childViewer.HandleMouseDown(event)) {
         return false;
       }
     }
@@ -2168,9 +2183,9 @@
     if (!this.InteractionEnabled) { return true; }
 
     // Let the annotation layers have first dibs on processing the event.
-    for (var i = 0; i < this.Layers.length; ++i) {
-      var layer = this.Layers[i];
-      if (layer.HandleDoubleClick && !layer.HandleDoubleClick(event)) {
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      var childViewer = this.Viewers[i];
+      if (childViewer.HandleDoubleClick && ! childViewer.HandleDoubleClick(event)) {
         return false;
       }
     }
@@ -2212,9 +2227,9 @@
     }
 
     // Let the annotation layers have first dibs on processing the event.
-    for (var i = 0; i < this.Layers.length; ++i) {
-      var layer = this.Layers[i];
-      if (layer.HandleMouseUp && !layer.HandleMouseUp(event)) {
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      var childViewer = this.Viewers[i];
+      if (childViewer.HandleMouseUp && !childViewer.HandleMouseUp(event)) {
         this.InteractionState = INTERACTION_NONE;
         return false;
       }
@@ -2294,9 +2309,9 @@
     }
 
     // Let the annotation layers have first dibs on processing the event.
-    for (var i = 0; i < this.Layers.length; ++i) {
-      var layer = this.Layers[i];
-      if (layer.HandleMouseMove && !layer.HandleMouseMove(event)) {
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      var childViewer = this.Viewers[i];
+      if (childViewer.HandleMouseMove && !childViewer.HandleMouseMove(event)) {
         return false;
       }
     }
@@ -2398,9 +2413,9 @@
     }
 
     // Let the annotation layers have first dibs on processing the event.
-    for (var i = 0; i < this.Layers.length; ++i) {
-      var layer = this.Layers[i];
-      if (layer.HandleMouseWheel && !layer.HandleMouseWheel(event)) {
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      var childViewer = this.Viewers[i];
+      if (childViewer.HandleMouseWheel && !childViewer.HandleMouseWheel(event)) {
         return false;
       }
     }
@@ -2450,8 +2465,8 @@
 
     // Key events are not going first to layers like mouse events.
     // Give layers a change to process them.
-    for (var i = 0; i < this.Layers.length; ++i) {
-      if (this.Layers[i].HandleKeyDown && !this.Layers[i].HandleKeyDown(event)) {
+    for (var i = 0; i < this.Viewers.length; ++i) {
+      if (this.Viewers[i].HandleKeyDown && !this.Viewers[i].HandleKeyDown(event)) {
         return false;
       }
     }
@@ -2600,9 +2615,9 @@
 
     // Let the annotation layers have first dibs on processing the event.
     var i;
-    for (i = 0; i < this.Layers.length; ++i) {
-      var layer = this.Layers[i];
-      if (layer.HandleKeyUp && !layer.HandleKeyUp(event)) {
+    for (i = 0; i < this.Viewers.length; ++i) {
+      var childViewer = this.Viewers[i];
+      if (childViewer.HandleKeyUp && !childViewer.HandleKeyUp(event)) {
         return false;
       }
     }
@@ -2610,8 +2625,8 @@
     // Copy paste error?
     // Key events are not going first to layers like mouse events.
     // Give layers a change to process them.
-    // for (i = 0; i < this.Layers.length; ++i) {
-    //  if (this.Layers[i].HandleKeyUp && !this.Layers[i].HandleKeyUp(event)) {
+    // for (i = 0; i < this.Viewers.length; ++i) {
+    //  if (this.Viewers[i].HandleKeyUp && !this.Viewers[i].HandleKeyUp(event)) {
     //    return false;
     //  }
     // }
@@ -2802,52 +2817,21 @@
   // ------------------------------------------------------
   // Access methods for vigilant
 
-  Viewer.prototype.GetNumberOfLayers = function () {
-    return this.Layers.length;
+  Viewer.prototype.GetNumberOfViewers = function () {
+    return this.Viewers.length;
   };
-  Viewer.prototype.GetLayer = function (idx) {
-    if (idx >= 0 && idx < this.Layers.length) {
-      return this.Layers[idx];
+  Viewer.prototype.GetViewer = function (idx) {
+    if (idx >= 0 && idx < this.Viewers.length) {
+      return this.Viewers[idx];
     }
     return null;
   };
-  Viewer.prototype.RemoveLayer = function (layer) {
-    var idx = this.Layers.indexOf(layer);
+  Viewer.prototype.RemoveViewer = function (childViewer) {
+    var idx = this.Viewers.indexOf(childViewer);
     if (idx < 0) {
       return;
     }
-    this.Layers.splice(idx, 1);
-  };
-
-  // TODO:
-  // Get rid of this.
-  Viewer.prototype.NewAnnotationLayer = function () {
-    // Create an annotation layer by default.
-    var annotationLayer = new SAM.AnnotationLayer(this.Div);
-    // Only for the text widget (dialog).
-    // It needs to turn off events to make the text input work.
-    annotationLayer.SetViewer(this);
-    // Lets just shallow copy the camera.
-    annotationLayer.SetCamera(this.GetCamera());
-
-    this.AddLayer(annotationLayer);
-    // TODO: Get rid of this.  master view is passed to draw.
-    // Hack so the scale widget can get the spacing.
-    annotationLayer.ScaleWidget.View = this.MainView;
-    // Hack only used for girder testing.
-    annotationLayer.Viewer = this;
-    annotationLayer.UpdateSize();
-
-    return annotationLayer;
-  };
-
-  Viewer.prototype.NewViewLayer = function () {
-    // Create an annotation layer by default.
-    var viewLayer = new SA.TileView(this.Div, false);
-    this.AddLayer(viewLayer);
-    viewLayer.UpdateSize();
-
-    return viewLayer;
+    this.Viewers.splice(idx, 1);
   };
 
   Viewer.prototype.TriggerEndInteraction = function () {

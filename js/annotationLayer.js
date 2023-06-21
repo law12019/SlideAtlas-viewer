@@ -689,22 +689,12 @@
         'z-index': '1',
         'box-sizing': 'border-box'
       })
-            .addClass('sa-resize');
-
-    // I do not like modifying the parent.
-    this.LayerDiv.saOnResize(
-            function () {
-              self.UpdateSize();
-            });
 
     // Hack for debugging
     SAM.DebugLayer = this;
 
     // TODO: Abstract the view to a layer somehow.
     this.AnnotationView = new SAM.View(this.LayerDiv);
-
-    this.AnnotationView.Canvas
-      .saOnResize(function () { self.UpdateCanvasSize(); });
 
     this.WidgetList = [];
     // TODO:
@@ -857,8 +847,8 @@
   AnnotationLayer.prototype.GetViewport = function () {
     return this.AnnotationView.Viewport;
   };
-  AnnotationLayer.prototype.UpdateCanvasSize = function () {
-    this.AnnotationView.UpdateCanvasSize();
+  AnnotationLayer.prototype.UpdateCanvasSize = function (viewport) {
+    this.AnnotationView.UpdateCanvasSize(viewport);
   };
   AnnotationLayer.prototype.Clear = function () {
     this.AnnotationView.Clear();
@@ -867,7 +857,6 @@
   // Get the div of the layer (main div).
   // It is used to append DOM GUI children.
   AnnotationLayer.prototype.GetParent = function () {
-    // return this.AnnotationView.Parent;
     return this.Parent;
   };
   // Get the current scale factor between pixels and world units.
@@ -1660,17 +1649,6 @@
         alert('AJAX - error() : annotation get');
       }
     });
-  };
-
-  AnnotationLayer.prototype.UpdateSize = function () {
-    if (!this.AnnotationView) {
-      return false;
-    }
-    if (this.AnnotationView.UpdateCanvasSize()) {
-      this.EventuallyDraw();
-      return true;
-    }
-    return false;
   };
 
   AnnotationLayer.prototype.Test = function () {

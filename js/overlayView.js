@@ -12,8 +12,7 @@
               'width': '100%',
               'height': '100%',
               'box-sizing': 'border-box',
-              'z-index': '150'})
-            .addClass('sa-resize');
+		  'z-index': '150'});
 
     this.View = new SA.TileView(this.OverlayViewDiv, true);
     var gl = this.View.gl;
