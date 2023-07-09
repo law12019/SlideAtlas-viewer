@@ -577,12 +577,22 @@
       return distObj.value;
     }
 
+    if (distObj.units.toLowerCase() === 'pm') {
+      distObj.units = 'm';
+      distObj.value *= 1e-12;
+      return distObj.value;
+    }
     if (distObj.units.toLowerCase() === 'nm') {
       distObj.units = 'm';
       distObj.value *= 1e-9;
       return distObj.value;
     }
     if (distObj.units.toLowerCase() === '\xB5m') {
+      distObj.units = 'm';
+      distObj.value *= 1e-6;
+      return distObj.value;
+    }
+    if (distObj.units.toLowerCase() === 'um') {
       distObj.units = 'm';
       distObj.value *= 1e-6;
       return distObj.value;
@@ -607,9 +617,24 @@
       distObj.units = 'm';
       return distObj.value;
     }
+    if (distObj.units.toLowerCase() === 'dam') {
+      distObj.units = 'm';
+      distObj.value *= 1e1;
+      return distObj.value;
+    }
+    if (distObj.units.toLowerCase() === 'hm') {
+      distObj.units = 'm';
+      distObj.value *= 1e2;
+      return distObj.value;
+    }
     if (distObj.units.toLowerCase() === 'km') {
       distObj.units = 'm';
       distObj.value *= 1e3;
+      return distObj.value;
+    }
+    if (distObj.units.toLowerCase() === 'Mm') {
+      distObj.units = 'm';
+      distObj.value *= 1e6;
       return distObj.value;
     }
     //console.log('Cannot convert ' + distObj.units + " to meters.");

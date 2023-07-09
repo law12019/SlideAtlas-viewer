@@ -46,6 +46,7 @@ var jsSrcFiles = [
   'js/maskToolPanel.js',
   // Core files
   'js/cookies.js',
+  'js/generalNavigationWidget.js',
   'js/girderNavigationWidget.js',
   'js/init.js',
   'js/viewEditMenu.js',

@@ -64,7 +64,7 @@
     var visToggle = $('<img>')
         .appendTo(div)
         .attr('type', 'image')
-        .attr('src', SA.ImagePathUrl + 'eyeClosed32.png')
+        .attr('src', SA.ImagePathUrl + 'unchecked.png')
         .css({
           'display': 'inline',
           'width': this.ButtonSize,
@@ -190,7 +190,8 @@
       });
     }
     // Hack to hide edit button for stand alone usage.
-    if ( ! annotationViewer.ItemId) {
+    // TODO: Clean up NERC check for edit option  
+    if (annotationViewer.UserData.login == 'guest') {
       self.EditToggle.hide();
     }
   }
@@ -338,7 +339,7 @@
     }
     this.Visible = true;
     this.VisToggle
-      .attr('src', SA.ImagePathUrl + 'eyeOpen32.png');
+      .attr('src', SA.ImagePathUrl + 'checked.png');
     this.DisplayAnnotation();
 
     // Record the visibility of this annotation in local storage.
@@ -351,7 +352,7 @@
     }
     this.Visible = false;
     this.VisToggle
-      .attr('src', SA.ImagePathUrl + 'eyeClosed32.png');
+      .attr('src', SA.ImagePathUrl + 'unchecked.png');
     this.Layer.SetVisibility(false);
 
     // Editing annots must be visible.
@@ -653,6 +654,29 @@
     // Change the color of the edit toggle to yellow, to show we are saving.
     this.EditToggle.css({'background-color': '#FF5'});
 
+
+    // NERC case: Save annotation with a cgi-bon script
+    if (self.AnnotationViewer.NercId) {
+      //let data = {image_id: this.AnnotationViewer.NercId, annotation: this.Data}; 
+      let dataStr = JSON.stringify(this.Data);
+      $.ajax({
+        type: "POST",
+	url: "http://199.94.60.126/cgi-bin/save-annotation.py",
+        data: {image_id: this.AnnotationViewer.NercId, annotation: dataStr}, 
+	dataType: "application/json",
+	encode: true,
+	success: function(response){
+          console.log("annotation saved: success");
+	}
+      }).done(function (data) {
+        console.log("annotation saved: done");
+      });
+      this.AnnotationSaved();
+      return;
+    }	
+
+    // Girder case
+    // TODO: Separate different databases into helper classes (save-read annotation)  
     if (!this.GirderAnnotId) {
       if (this.Layer.IsEmpty()) {
         // Do not save a new annotation if it is empty.

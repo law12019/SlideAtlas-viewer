@@ -60,6 +60,11 @@
             function () {
               self.UpdateSize();
             });
+    this.Div.on( "load",
+            function() {
+              self.UpdateSize();
+            });
+      
     this.Div.addClass('ViewerDiv');
     // So we can programatically set the keyboard focus
     this.Div.attr('tabindex', '1');
@@ -384,7 +389,8 @@
   // Viewers have a Draw(masterView) method.
   // Right now the only viewer I have is the AnnotationViewer.
   Viewer.prototype.AddChildViewer = function (childViewer) {
-    this.Viewers.push(childViewer);
+      this.Viewers.push(childViewer);
+      this.UpdateSize();
   };
 
   // Abstracting saViewer  for viewer and dualViewWidget.
@@ -2843,25 +2849,16 @@
     }
 
     // Update the url to the current view.
-    var cam = this.GetCamera();
-    var fp = cam.GetWorldFocalPoint();
-    var width = Math.round(cam.GetWidth());
-    var height = Math.round(cam.GetHeight());
-    var left = Math.round(fp[0] - width / 2);
-    var top = Math.round(fp[1] - height / 2);
-    var rot = Math.round(cam.GetWorldRotation());
+    let cam = this.GetCamera();
+    let fp = cam.GetWorldFocalPoint();
+    let width = Math.round(cam.GetWidth());
+    let height = Math.round(cam.GetHeight());
+    let left = Math.round(fp[0] - width / 2);
+    let top = Math.round(fp[1] - height / 2);
+    let rot = Math.round(cam.GetWorldRotation());
 
-    // TODO: Fix this
-    // Image._id is just a random id.
-    // var imageId = this.GetCache().Image._id;
-    // Hack to get th real id from a tile url.
-    var url = this.GetCache().TileSource.getTileUrl(0, 0, 0, 0);
-    var imageId = url.split('/')[3];
-
-    url = window.location.href;
-    var end = url.indexOf('item/');
-    url = url.substr(0, end + 4);
-    url = url + '/' + imageId + '?bounds=' + left + ',' + top +
+    let url = this.GetCache().TileSource.url;
+    url = url + '?bounds=' + left + ',' + top +
       ',' + (left + width) + ',' + (top + height);
 
     if (rot !== 0) {
@@ -2869,6 +2866,25 @@
     }
 
     this.ShareDisplay.text(url);
+      //window.history.pushState({},"", url);
+
+    // Test to show we can save annotation with a cgi-bin script
+    //var formData = {
+    //  Customer: "Mia Law",
+    //};
+
+    //$.ajax({
+    //  type: "POST",
+    //  url: "http://199.94.60.126/cgi-bin/test.py",
+    //  data: formData,
+    //  dataType: "json",
+    //  encode: true,
+    //  success: function(response){
+    //                console.log(response);
+    //  }
+    //}).done(function (data) {
+    //  console.log(data);
+    //});
   };
 
   // ------------------------------------------------------

@@ -59,9 +59,9 @@
   function AnnotationToolPanel (layerPanel) {
     this.LayerPanel = layerPanel;
     // Any new layers created have to know the viewer.
-    this.Viewer = layerPanel.Viewer;
+    this.ParentTileViewer = layerPanel.ParentTileViewer;
 
-    this.Parent = this.Viewer.GetDiv();
+    this.Parent = this.ParentTileViewer.GetDiv();
 
     // -----------------------------------------------------
 
@@ -238,7 +238,7 @@
         function () {
           self.LayerPanel.WithEditingLayerCall(
             function (layerGui) {
-              self.Viewer.InteractionOn();
+              self.ParentTileViewer.InteractionOn();
               (self[onCallbackName])(layerGui);
             });
         });
@@ -431,7 +431,7 @@
       this.LayerPanel.EditingLayer.Layer.SetSelected(false);
       this.LayerPanel.EditingLayer.Layer.EventuallyDraw();
     }
-    this.Viewer.GetParentDiv().css({'cursor': ''});
+    this.ParentTileViewer.GetParentDiv().css({'cursor': ''});
     this.ActiveToolButton = this.CursorButton;
     // Is this thie correct behavior?
     if (this.LayerGui) {

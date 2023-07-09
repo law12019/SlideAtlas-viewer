@@ -15,20 +15,35 @@
 // Make a default layerGui that is not visible until it has its first annotation
 
 // TODO:
+// Clean up Girder vs NERC annotation
+//   Right now: this.ItemId == false => NERC
 // Click Select circle not working
 // Cannot navigate viewer with touch.
 
 (function () {
   'use strict';
 
-  function AnnotationViewer (parentTileViewer, itemId) {
+  function AnnotationViewer (parentTileViewer, nercUrl=false, girderItemId=false) {
+    this.UserData = {_id: "000", login: 'guest'};  
     this.ParentTileViewer = parentTileViewer;
     this.ParentDiv = parentTileViewer.GetDiv();
-    this.ItemId = itemId;
+    // TODO: Girder ID should be handled in separate class. Combine this id with Nerc.
+    this.ItemId = girderItemId;
+    if (nercUrl) {
+      let tmp = nercUrl.split('/')
+      // TODO: Get rid of this hard parsing of the id from the url.	
+      this.NercId = tmp[3] + '/' + tmp[4];
+    } else {
+      this.NercId = false
+    }
+    // hack to get the base URL needed to compute tile urls for generalNavigationWidget.
+    let tmp = window.location.href;
+    this.BaseNercUrl = tmp.split('/').slice(0,3).join('/') + '/';
+
     this.LayerGuis = [];
     this.ModifiedCount = 0;
     this.EditingLayerGui = undefined;
-    
+      
     this.ParentTileViewer.ScaleOn();
 
     // Because of loading on demand, the easiest way to restore
@@ -76,15 +91,21 @@
 
     // The pannel should probably not be managing this navigation widget.
     // I am putting it here as a temporary home.
-    if (itemId) {
-      this.InitializeNavigation(viewer.GetDiv(), itemId);
-    }
-    this.Initialize(this.Div, itemId);
+    // For NERC
+    if (this.ItemId) {
+      this.InitializeNavigation(parentTileViewer.GetDiv(), this.ItemId);
+    } else {
+      this.InitializeNavigation(parentTileViewer.GetDiv(), this.NercId);
+    }	
+    this.Initialize(this.Div, this.ItemId);
 
+    // NERC: Annotation authoring. Alternative tp Girder.
+    this.InitializeDefaultToolPanel();
+      
     // To get event calls from the viewer.
     this.ParentTileViewer.AddChildViewer(this);
   }
-
+    
   AnnotationViewer.prototype.GetTileViewer = function (obj) {
     return this.ParentTileViewer;
   }
@@ -188,7 +209,11 @@
   };
 
   AnnotationViewer.prototype.InitializeNavigation = function (parent, itemId) {
-    var nav = new SA.GirderNavigationWidget(parent, itemId);
+    // Girder
+    //var nav = new SA.GeneralNavigationWidget(parent, itemId);
+    //var self = this;
+    //nav.SetChangeItemCallback(function (itemId) { self.ChangeItem(itemId); });
+    var nav = new SA.GeneralNavigationWidget(parent, itemId);
     var self = this;
     nav.SetChangeItemCallback(function (itemId) { self.ChangeItem(itemId); });
   };
@@ -400,14 +425,14 @@
     $('<img>')
       .appendTo(visibilityDiv)
       .addClass('sa-view-button')
-      .attr('src', SA.ImagePathUrl + 'eyeClosed32.png')
+      .attr('src', SA.ImagePathUrl + 'unchecked.png')
       .css({
         'height': '24px',
         'margin-left': '24px'});
     $('<img>')
       .appendTo(visibilityDiv)
       .addClass('sa-view-button')
-      .attr('src', SA.ImagePathUrl + 'eyeOpen32.png')
+      .attr('src', SA.ImagePathUrl + 'checked.png')
       .css({'height': '24px'});
     $('<p>')
       .appendTo(visibilityDiv)
@@ -470,7 +495,41 @@
 
   // ===============================================================================
   // Call back from navigation to update the annotation to match the viewer item.
+  // HM/Nerc
   AnnotationViewer.prototype.ChangeItem = function (itemId) {
+    // Change the image in the viewer.
+    var self = this;
+
+    //this.ItemId = itemId;
+    this.NercId = itemId;
+
+    // There is contention trying to restore annotation visibility in the next item.
+    // Deleting Annotation Buttons erases local storage of the visible names.
+    // Probably a better solution than this is to have two set visibility methods.
+    // Only the one used by the gui changes local storage values.
+    // For now, save and restore the cached names.
+    var savedNames = this.LocalStorageVisibleAnnotationNames.splice(0);
+
+    // Now for the annotation stuff.
+    this.DeleteAnnotationButtons();
+    this.LocalStorageVisibleAnnotationNames = savedNames;
+    this.Initialize(this.Div, undefined);
+
+    let url = window.location.href;
+    $.ajax({
+        url: `${url}/info.json`,
+        dataType: 'application/json',
+        complete: function (data) {
+            let image_info = JSON.parse(data.responseText);
+	    self.LoadItemToViewer(itemId, image_info);
+        }
+    });
+  };
+
+
+  // ===============================================================================
+  // Call back from navigation to update the annotation to match the viewer item.
+  AnnotationViewer.prototype.ChangeGirderItem = function (itemId) {
     // Change the image in the viewer.
     var self = this;
 
@@ -487,14 +546,17 @@
     this.DeleteAnnotationButtons();
     this.LocalStorageVisibleAnnotationNames = savedNames;
     this.Initialize(this.Div, itemId);
+
     girder.rest.restRequest({
       url: 'item/' + itemId + '/tiles',
       method: 'GET'
     }).done(function (data) {
-      self.LoadItemToViewer(itemId, data);
+      self.LoadGirderItemToViewer(itemId, data);
     });
   };
 
+
+    
   // Now update the annotation GUI
   AnnotationViewer.prototype.DeleteAnnotationButtons = function () {
     this.EditingLayerGui = undefined;
@@ -542,6 +604,29 @@
   };
 
   AnnotationViewer.prototype.LoadItemToViewer = function (itemId, data) {
+    // TODO: if a viewer already exists, do we render again?
+    // SlideAtlas bundles its own version of jQuery, which should attach itself to 'window.$' when it's sourced
+    // The 'this.$el' still uses the Girder version of jQuery, which will not have 'saViewer' registered on it.
+    var baseUrl = this.BaseNercUrl + itemId;	  
+    var tileSource = {
+      height: data.height,
+      width: data.width,
+      tileWidth: data.tile_width,
+      tileHeight: data.tile_height,
+      minLevel: 0,
+      maxLevel: data.max_level,
+      units: data.units,
+      spacing: [data.x_sample, data.y_sample],
+      getTileUrl: function (level, x, y, z) {
+        return baseUrl + `/${level}/${x}/${y}.jpg`;
+      }
+    };
+
+    var note = SA.TileSourceToNote(tileSource);
+    this.ParentTileViewer.SetNote(note, 0, true);
+  };
+
+  AnnotationViewer.prototype.LoadGirderItemToViewer = function (itemId, data) {
     // TODO: if a viewer already exists, do we render again?
     // SlideAtlas bundles its own version of jQuery, which should attach itself to 'window.$' when it's sourced
     // The 'this.$el' still uses the Girder version of jQuery, which will not have 'saViewer' registered on it.
@@ -697,6 +782,16 @@
   };
 
   AnnotationViewer.prototype.GetDefaultLayerName = function () {
+    if (this.UserData.login == "guest") {
+      // NERC condition (no Girder)
+      let username = localStorage.getItem("username");
+      if (username == undefined) {
+        username = prompt("Please enter a username");
+        localStorage.setItem("username", username);
+      }
+      this.UserData = {_id: username, login: username};
+    }	
+
     return this.UserData.login;
   };
 
@@ -716,6 +811,8 @@
       {'annotation': {'name': defaultLayerName}, 'creatorId': this.UserData._id},
       this);
     this.LayerGuis.push(layerGui);
+    this.ParentTileViewer.UpdateSize();
+      
     return layerGui;
   };
 
