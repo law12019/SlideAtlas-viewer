@@ -436,9 +436,10 @@
       this.Parent.attr('sa-note-id', args.note.Id || args.note.TempId);
       this.Parent.attr('sa-viewer-index', this.saViewerIndex);
     }
-    if (args.hideCopyright !== undefined) {
-      this.SetCopyrightVisibility(!args.hideCopyright);
-    }
+    //if (args.hideCopyright !== undefined) {
+    //  this.SetCopyrightVisibility(!args.hideCopyright);
+    //}
+    this.SetCopyrightVisibility(!args.hideCopyright);
     if (args.interaction !== undefined) {
       this.SetInteractionEnabled(args.interaction);
     }
@@ -2887,6 +2888,53 @@
     //});
   };
 
+    // NERC
+  Viewer.prototype.LoadSlide = function (itemId) {
+      var self = this;
+      // TODO fix this hard coded hack
+      let base_url = "http://199.94.60.126/" + itemId;
+      $.ajax({
+          cache: false,
+          url: url + '/info.json',
+          dataType: 'application/json',
+          complete: function (data) {
+              let image_info = JSON.parse(data.responseText);
+	      self.LoadSlideInfo(itemId, base_url, image_info);
+          }
+      });
+  }  
+
+  Viewer.prototype.LoadSlideInfo = function (itemId, base_url, data) {
+    var tileSource = {
+      height: data.height,
+      width: data.width,
+      tileWidth: data.tile_width,
+      tileHeight: data.tile_height,
+      minLevel: 0,
+      maxLevel: data.max_level,
+      units: data.units,
+      spacing: [data.x_sample, data.y_sample],
+      getTileUrl: function (level, x, y, z) {
+        return baseUrl + `/${level}/${x}/${y}.jpg`;
+      }
+    };
+
+    // TODO: Legacy note.  Clean this up.
+    var note = SA.TileSourceToNote(tileSource);
+    //if (note) {
+    //  this.saNote = note;
+    //  let index = 0;
+    //  this.SetViewerRecord(note.ViewerRecords[index]);
+    //  this.Parent.attr('sa-note-id', args.note.Id || args.note.TempId);
+    //  this.Parent.attr('sa-viewer-index', this.saViewerIndex);
+    //}
+
+    this.SetNote(note, 0, true);
+  };
+
+
+
+    
   // ------------------------------------------------------
 
   SA.Viewer = Viewer;

@@ -219,6 +219,10 @@
     annotationLayer.SetActivatedCallback(function () { self.EditOn(); });
     annotationLayer.SetModifiedCallback(function () { self.AnnotationModified(); });
 
+      // HACK to get viewport matching parent viewer.. What a pain
+      // TODO: CLEAN THIS UP
+      this.AnnotationViewer.ParentTileViewer.UpdateSize();
+      
     return annotationLayer;
   };
 
@@ -661,6 +665,7 @@
       let dataStr = JSON.stringify(this.Data);
       $.ajax({
         type: "POST",
+	// NERC HACK hack  hard coded url !!!!!!  
 	url: "http://199.94.60.126/cgi-bin/save-annotation.py",
         data: {image_id: this.AnnotationViewer.NercId, annotation: dataStr}, 
 	dataType: "application/json",

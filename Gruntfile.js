@@ -76,7 +76,8 @@ var jsSrcFiles = [
   'js/stackSectionWidget.js',
   'js/layerView.js',
   'js/heatMap.js',
-  'js/overlayView.js'
+  'js/overlayView.js',
+  'js/hmNotesWidget.js'
 ];
 
 var cssSrcFiles = [

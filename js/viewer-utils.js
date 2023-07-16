@@ -3712,12 +3712,24 @@
 // Use it for the presentation edit panel
 // use it for dual view.
 
-  function ResizePanel (parent) {
+    function ResizePanel (parent) {
     var self = this;
 
+    // hack
+    // TODO: move initialization out of viewer, or add this panel as an option
+    // in the viewer arguments.
+    if (SA.ImagePathUrl == undefined) {
+      SA.ImagePathUrl = "../../slideatlas/img/";
+    }
+      
     // For animating the display of the notes window (DIV).
     this.Width = 353;
 
+    // Set this after viewer is created.  Viewer constructor needs MainDiv
+    this.Viewer = undefined;
+    // for debugging
+    this.Parent = parent;  
+      
     this.PanelDiv = $('<div>').appendTo(parent)
         .css({
           'background-color': 'white',
@@ -3732,13 +3744,18 @@
         .css({
           'position': 'absolute',
           'top': '0px',
-          'bottom': '0px',
+          'height': '100%',
           'left': this.Width + 'px',
           'right': '0px',
           'border-left': '1px solid #AAA'})
         .attr('draggable', 'false')
         .on('dragstart', function () { return false; });
 
+    this.Parent.saOnResize(
+            function () {
+              self.UpdateSize();
+            });
+      
     this.OpenButton = $('<img>')
         .appendTo(this.MainDiv)
         .css({'position': 'absolute',
@@ -3749,7 +3766,7 @@
           'opacity': '0.6',
           '-moz-user-select': 'none',
           '-webkit-user-select': 'none',
-          'z-index': '6'})
+          'z-index': '510'})
         .attr('src', SA.ImagePathUrl + 'dualArrowRight2.png')
         .on('click touchstart',
             function () { self.SetVisibility(true); })
@@ -3769,7 +3786,7 @@
           'opacity': '0.6',
           '-moz-user-select': 'none',
           '-webkit-user-select': 'none',
-          'z-index': '6'})
+          'z-index': '510'})
         // .hide()
         .attr('src', SA.ImagePathUrl + 'dualArrowLeft2.png')
         .on('click touchstart',
@@ -3798,6 +3815,7 @@
           self.StartDrag();
           return false;
         });
+      this.UpdateSize();
   }
 
   // TODO: Remove reference to body directly
@@ -3833,14 +3851,30 @@
   // Get rid of this.
   ResizePanel.prototype.SetWidth = function (width) {
     this.Width = width;
-    this.PanelDiv.css({'width': this.Width + 'px'});
-    this.MainDiv.css({'left': this.Width + 'px'});
+    let mainWidth = this.Parent.width() - this.Width - 2;
+    this.PanelDiv.css({'width': this.Width + 'px',
+                       'height': this.Parent.height()});
+    this.MainDiv.css({'left': this.Width + 'px',
+                      'width': mainWidth,
+                      'height': this.Parent.height()});		      
     this.ResizeEdge.css({'left': (this.Width - 2) + 'px'});
 
+    // This causes infinite recursion. Why does a child resize trigger
+    // the parents resize callback?
+    // this.MainDiv.trigger('resize');
+      
     // Needed for viewers to sync canvas size.
-    $(window).trigger('resize');
+    if (this.Viewer) {
+      this.Viewer.UpdateSize();
+    }
   };
 
+
+  ResizePanel.prototype.UpdateSize = function () {
+    this.SetWidth(this.Width);
+  }
+
+    
   ResizePanel.prototype.AnimateNotesWindow = function () {
     var animationTime = new Date().getTime() - this.AnimationStartTime;
     if (animationTime > this.AnimationDuration || this.AnimationDuration <= 0) {

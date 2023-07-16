@@ -1,3 +1,7 @@
+// annotationViewer may not be the best name for this class.
+// it also has ChangeItem which loads a new tileSource in the tileViewer.
+// TODO Clean this up.  A window should have a list of viewers which should have guis.
+
 // This class has a single instance that creates the left annotation HTML panel.
 // It also keeps a list of AnnotationLayerGuis.
 // Each creates a button int the panel and an AnnotationLayer to draw on.
@@ -24,6 +28,9 @@
   'use strict';
 
   function AnnotationViewer (parentTileViewer, nercUrl=false, girderItemId=false) {
+    // TODO: register multiple viewers (note, tile, annotation) with the navigationWidget.
+    // This is just hard coded.
+    SA.annotationViewer = this;
     this.UserData = {_id: "000", login: 'guest'};  
     this.ParentTileViewer = parentTileViewer;
     this.ParentDiv = parentTileViewer.GetDiv();
@@ -105,6 +112,69 @@
     // To get event calls from the viewer.
     this.ParentTileViewer.AddChildViewer(this);
   }
+
+  AnnotationViewer.prototype.LoadSlideAnnotation = function (item_id) {
+    var self = this;
+
+    // There is contention trying to restore annotation visibility in the next item.
+    // Deleting Annotation Buttons erases local storage of the visible names.
+    // Probably a better solution than this is to have two set visibility methods.
+    // Only the one used by the gui changes local storage values.
+    // For now, save and restore the cached names.
+    var savedNames = this.LocalStorageVisibleAnnotationNames.splice(0);
+
+    // Now for the annotation stuff.
+    this.DeleteAnnotationButtons();
+    this.LocalStorageVisibleAnnotationNames = savedNames;
+    this.Initialize(this.Div, undefined);
+
+    // hack HACK TODO get rid of hard coded url
+    let url = "http://199.94.60.126/" + item_id + "/annotation.json";
+    $.ajax({
+        cache: false,
+        url: url,
+        dataType: 'application/json',
+        complete: function (data) {
+          self.NercId = item_id;
+          self.LoadJSONAnnotations(JSON.parse(data.responseText));
+        }
+    });
+  }
+
+    
+  // ===============================================================================
+  // Call back from navigation to update the annotation to match the viewer item.
+  // HM/Nerc. Loads a new tilesource into the tileviewer.
+  AnnotationViewer.prototype.ChangeItem = function (itemId) {
+    // Change the image in the viewer.
+    var self = this;
+
+    this.NercId = itemId;
+
+    // There is contention trying to restore annotation visibility in the next item.
+    // Deleting Annotation Buttons erases local storage of the visible names.
+    // Probably a better solution than this is to have two set visibility methods.
+    // Only the one used by the gui changes local storage values.
+    // For now, save and restore the cached names.
+    //var savedNames = this.LocalStorageVisibleAnnotationNames.splice(0);
+
+    // Now for the annotation stuff.
+    //this.DeleteAnnotationButtons();
+    //this.LocalStorageVisibleAnnotationNames = savedNames;
+    //this.Initialize(this.Div, false);
+    //this.Initialize(this.Div, itemId);
+
+    let base_url = "http://199.94.60.126/" + itemId;
+    $.ajax({
+	  cache: false,
+          url: `${base_url}/info.json`,
+          dataType: 'application/json',
+          complete: function (data) {
+	      let image_info = JSON.parse(data.responseText);
+	      self.LoadItemToViewer(itemId, image_info);
+          }
+    });
+  };
     
   AnnotationViewer.prototype.GetTileViewer = function (obj) {
     return this.ParentTileViewer;
@@ -493,39 +563,6 @@
           });
   };
 
-  // ===============================================================================
-  // Call back from navigation to update the annotation to match the viewer item.
-  // HM/Nerc
-  AnnotationViewer.prototype.ChangeItem = function (itemId) {
-    // Change the image in the viewer.
-    var self = this;
-
-    //this.ItemId = itemId;
-    this.NercId = itemId;
-
-    // There is contention trying to restore annotation visibility in the next item.
-    // Deleting Annotation Buttons erases local storage of the visible names.
-    // Probably a better solution than this is to have two set visibility methods.
-    // Only the one used by the gui changes local storage values.
-    // For now, save and restore the cached names.
-    var savedNames = this.LocalStorageVisibleAnnotationNames.splice(0);
-
-    // Now for the annotation stuff.
-    this.DeleteAnnotationButtons();
-    this.LocalStorageVisibleAnnotationNames = savedNames;
-    this.Initialize(this.Div, undefined);
-
-    let url = window.location.href;
-    $.ajax({
-        url: `${url}/info.json`,
-        dataType: 'application/json',
-        complete: function (data) {
-            let image_info = JSON.parse(data.responseText);
-	    self.LoadItemToViewer(itemId, image_info);
-        }
-    });
-  };
-
 
   // ===============================================================================
   // Call back from navigation to update the annotation to match the viewer item.
@@ -603,6 +640,8 @@
     this.LocalStorageVisibleAnnotationNames = names;
   };
 
+// Why is the navigation callback to change the viewer handled by the annotationViewer?
+// TODO: Clean this up. (What a mess, legacy junk).
   AnnotationViewer.prototype.LoadItemToViewer = function (itemId, data) {
     // TODO: if a viewer already exists, do we render again?
     // SlideAtlas bundles its own version of jQuery, which should attach itself to 'window.$' when it's sourced
@@ -625,6 +664,7 @@
     var note = SA.TileSourceToNote(tileSource);
     this.ParentTileViewer.SetNote(note, 0, true);
   };
+
 
   AnnotationViewer.prototype.LoadGirderItemToViewer = function (itemId, data) {
     // TODO: if a viewer already exists, do we render again?
@@ -811,6 +851,8 @@
       {'annotation': {'name': defaultLayerName}, 'creatorId': this.UserData._id},
       this);
     this.LayerGuis.push(layerGui);
+    // This sets layerGui.Layer which is needed to set viewports properly
+    //layerGui.DisplayAnnotaton();
     this.ParentTileViewer.UpdateSize();
       
     return layerGui;

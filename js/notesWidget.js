@@ -1062,7 +1062,11 @@
 (function () {
   'use strict';
 
-  function NotesWidget (parent, display) {
+  function NotesWidget (parent, display=undefined) {
+    if (display == undefined) {
+      display = SA.Viewer;
+    }
+	
     this.ModifiedCallback = null;
     // This is a hack.  I do not know when to save the camera.
     // The save button will save the camera for the last note displayed.

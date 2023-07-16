@@ -139,6 +139,15 @@
     if (this.ChangeItemCallback) {
       (this.ChangeItemCallback)(this.ItemId);
     }
+      
+    if (SA.notesWidget) {
+      SA.notesWidget.LoadSlideNotes(this.ItemId);
+    }
+      
+    if (SA.annotationViewer) {
+      SA.annotationViewer.LoadSlideAnnotation(this.ItemId);
+    }
+
   };
 
   GeneralNavigationWidget.prototype.Initialize = function () {
@@ -247,6 +256,9 @@
     if (this.ItemIndex <= 0) {
       return;
     }
+    if (this.UnsavedNotesCheck == false) {
+      return;
+    }      
     this.ItemIndex -= 1;
     this.ItemId = this.FolderItemIds[this.ItemIndex];
     this.ChangeItem();
@@ -258,6 +270,9 @@
     // Make sure user not changes are not pending to be saved.
     // if (SA.notesWidget) { SA.notesWidget.Flush(); }
     if (this.ItemIndex >= this.FolderItemIds.length) {
+      return;
+    }
+    if (this.UnsavedNotesCheck == false) {
       return;
     }
 
@@ -294,8 +309,10 @@
     if (this.ItemIndex <= 0) {
       return;
     }
+    if (this.UnsavedNotesCheck == false) {
+      return;
+    }
     var inc = this.GetFastIncrement();
-
     this.ItemIndex -= inc;
     if (this.ItemIndex < 0) {
       this.ItemIndex = 0;
@@ -305,6 +322,16 @@
     this.Update();
   };
 
+
+  GeneralNavigationWidget.prototype.UnsavedNotesCheck = function() {
+    var check = true;
+    if (SA.notesWidget && SA.notesWidget.Modified) {
+      check = confirm('Unsaved edits will be lost.  Are you sure you want to move to the next slide?');
+    }
+    return check;
+    }
+
+    
   GeneralNavigationWidget.prototype.NextSlide = function () {
     if (!this.FolderItemIds) { return; }
     // Make sure user notw changes are not pending to be saved.
@@ -313,8 +340,11 @@
     if (this.ItemIndex >= this.FolderItemIds.length) {
       return;
     }
+    if (this.UnsavedNotesCheck == false) {
+      return;
+    }
     var inc = this.GetFastIncrement();
-
+    
     this.ItemIndex += inc;
     if (this.ItemIndex >= this.FolderItemIds.length) {
       this.ItemIndex = this.FolderItemIds.length - 1;
